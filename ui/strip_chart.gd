@@ -23,12 +23,15 @@ class_name StripChart
 extends Control
 
 # TUNABLE: chart layout and text sizes (pixels).
-const MARGIN_LEFT: float = 62.0
-const MARGIN_RIGHT: float = 12.0
-const MARGIN_TOP: float = 30.0
-const MARGIN_BOTTOM: float = 24.0
-const TICK_FONT_SIZE: int = 13
-const TITLE_FONT_SIZE: int = 15
+const MARGIN_LEFT: float = 92.0
+const MARGIN_RIGHT: float = 18.0
+const MARGIN_TOP: float = 44.0
+const MARGIN_BOTTOM: float = 34.0
+const TICK_FONT_SIZE: int = UiStyle.CHART_TICK
+const TITLE_FONT_SIZE: int = UiStyle.CHART_TITLE
+const LEGEND_BASELINE: float = 29.0   # title/legend text baseline
+const LEGEND_LINE_Y: float = 22.0     # legend sample lines
+const LEGEND_SAMPLE: float = 33.0     # sample line length
 const TARGET_Y_TICKS: int = 5
 const TARGET_X_TICKS: int = 6
 const DASH_LENGTH: float = 9.0
@@ -59,7 +62,7 @@ var _scrub_end_time: float = -1.0  # < 0 means "follow the newest sample"
 
 func _init() -> void:
 	clip_contents = true
-	custom_minimum_size = Vector2(240.0, 140.0)
+	custom_minimum_size = Vector2(360.0, 210.0)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 
@@ -113,15 +116,15 @@ func _draw() -> void:
 			for trace in traces:
 				if trace.visible and trace.ghost:
 					_draw_series(ghost.recorder, trace.channel, trace.display_scale,
-							ghost.color, trace.width * DisplaySettings.line_scale(), false, plot_rect, time_range, y_range)
+							ghost.color, trace.width * UiStyle.LINE_WIDTH_SCALE * DisplaySettings.line_scale(), false, plot_rect, time_range, y_range)
 	for trace in traces:
 		if trace.visible:
 			_draw_series(recorder, trace.channel, trace.display_scale, trace.color,
-					trace.width * DisplaySettings.line_scale(), trace.dashed, plot_rect, time_range, y_range)
+					trace.width * UiStyle.LINE_WIDTH_SCALE * DisplaySettings.line_scale(), trace.dashed, plot_rect, time_range, y_range)
 	_draw_title_and_legend()
 	_draw_hover_readout(plot_rect, time_range, y_range)
 	if frozen:
-		_draw_text(Vector2(plot_rect.end.x - 4.0, plot_rect.position.y + 14.0),
+		_draw_text(Vector2(plot_rect.end.x - 4.0, plot_rect.position.y + 22.0),
 				"paused: drag to scrub", TICK_FONT_SIZE, SignalColors.WARNING_TEXT,
 				HORIZONTAL_ALIGNMENT_RIGHT)
 
@@ -221,7 +224,7 @@ func _draw_grid(plot_rect: Rect2, time_range: Vector2, y_range: Vector2) -> void
 		var y := _value_to_y(tick, plot_rect, y_range)
 		draw_line(Vector2(plot_rect.position.x, y), Vector2(plot_rect.end.x, y),
 				DisplaySettings.plot_grid(), 1.0)
-		_draw_text(Vector2(plot_rect.position.x - 6.0, y + 4.0),
+		_draw_text(Vector2(plot_rect.position.x - 8.0, y + 7.0),
 				NumberFormat.for_step(tick, y_step), TICK_FONT_SIZE,
 				SignalColors.PLOT_AXIS_TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
 
@@ -230,7 +233,7 @@ func _draw_grid(plot_rect: Rect2, time_range: Vector2, y_range: Vector2) -> void
 		var x := _time_to_x(tick, plot_rect, time_range)
 		draw_line(Vector2(x, plot_rect.position.y), Vector2(x, plot_rect.end.y),
 				DisplaySettings.plot_grid(), 1.0)
-		_draw_text(Vector2(x, plot_rect.end.y + 16.0),
+		_draw_text(Vector2(x, plot_rect.end.y + 24.0),
 				NumberFormat.for_step(tick, x_step) + " s", TICK_FONT_SIZE,
 				SignalColors.PLOT_AXIS_TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 
@@ -339,34 +342,39 @@ func _draw_title_and_legend() -> void:
 	var title_text := chart_title
 	if y_unit != "":
 		title_text += " (%s)" % y_unit
-	_draw_text(Vector2(MARGIN_LEFT, 19.0), title_text, TITLE_FONT_SIZE,
+	_draw_text(Vector2(MARGIN_LEFT, LEGEND_BASELINE), title_text, TITLE_FONT_SIZE,
 			SignalColors.PLOT_AXIS_TEXT, HORIZONTAL_ALIGNMENT_LEFT)
 
 	# Legend entries flow to the right of the title.
 	var font := get_theme_default_font()
 	var x := MARGIN_LEFT + font.get_string_size(title_text, HORIZONTAL_ALIGNMENT_LEFT,
-			-1, TITLE_FONT_SIZE).x + 20.0
+			-1, TITLE_FONT_SIZE).x + 30.0
 	for trace in traces:
 		if not trace.visible:
 			continue
-		var sample_line := PackedVector2Array([Vector2(x, 14.0), Vector2(x + 22.0, 14.0)])
+		var width := trace.width * UiStyle.LINE_WIDTH_SCALE
+		var y := LEGEND_LINE_Y
 		if trace.dashed:
-			draw_line(sample_line[0], Vector2(x + 9.0, 14.0), trace.color, trace.width)
-			draw_line(Vector2(x + 14.0, 14.0), sample_line[1], trace.color, trace.width)
+			draw_line(Vector2(x, y), Vector2(x + LEGEND_SAMPLE * 0.4, y), trace.color, width)
+			draw_line(Vector2(x + LEGEND_SAMPLE * 0.6, y), Vector2(x + LEGEND_SAMPLE, y),
+					trace.color, width)
 		else:
-			draw_polyline(sample_line, trace.color, trace.width)
-		_draw_text(Vector2(x + 27.0, 19.0), trace.label, TICK_FONT_SIZE,
-				SignalColors.PLOT_AXIS_TEXT, HORIZONTAL_ALIGNMENT_LEFT)
-		x += 40.0 + font.get_string_size(trace.label, HORIZONTAL_ALIGNMENT_LEFT, -1,
-				TICK_FONT_SIZE).x
+			draw_line(Vector2(x, y), Vector2(x + LEGEND_SAMPLE, y), trace.color, width)
+		x = _draw_legend_label(x, trace.label, SignalColors.PLOT_AXIS_TEXT, font)
 	if not show_ghosts or not traces.any(func(t: ChartTrace) -> bool: return t.ghost):
 		return
 	for ghost in ghosts:
-		draw_line(Vector2(x, 14.0), Vector2(x + 22.0, 14.0), ghost.color, 2.5)
-		_draw_text(Vector2(x + 27.0, 19.0), ghost.label, TICK_FONT_SIZE,
-				ghost.color, HORIZONTAL_ALIGNMENT_LEFT)
-		x += 40.0 + font.get_string_size(ghost.label, HORIZONTAL_ALIGNMENT_LEFT, -1,
-				TICK_FONT_SIZE).x
+		draw_line(Vector2(x, LEGEND_LINE_Y), Vector2(x + LEGEND_SAMPLE, LEGEND_LINE_Y),
+				ghost.color, 2.5 * UiStyle.LINE_WIDTH_SCALE)
+		x = _draw_legend_label(x, ghost.label, ghost.color, font)
+
+
+# Legend text after a sample line starting at x; returns where the next entry starts.
+func _draw_legend_label(x: float, text: String, color: Color, font: Font) -> float:
+	_draw_text(Vector2(x + LEGEND_SAMPLE + 8.0, LEGEND_BASELINE), text, TICK_FONT_SIZE,
+			color, HORIZONTAL_ALIGNMENT_LEFT)
+	return x + LEGEND_SAMPLE + 26.0 + font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT,
+			-1, TICK_FONT_SIZE).x
 
 
 func _draw_hover_readout(plot_rect: Rect2, time_range: Vector2, y_range: Vector2) -> void:
@@ -393,7 +401,7 @@ func _draw_hover_readout(plot_rect: Rect2, time_range: Vector2, y_range: Vector2
 		if not trace.visible:
 			continue
 		var value := recorder.get_value(trace.channel, index) * trace.display_scale
-		draw_circle(Vector2(x, _value_to_y(value, plot_rect, y_range)), 3.5, trace.color)
+		draw_circle(Vector2(x, _value_to_y(value, plot_rect, y_range)), 5.0, trace.color)
 		lines.append("%s: %s %s" % [trace.label, NumberFormat.significant(value, 4), y_unit])
 		line_colors.append(trace.color)
 
@@ -403,16 +411,16 @@ func _draw_hover_readout(plot_rect: Rect2, time_range: Vector2, y_range: Vector2
 	for line in lines:
 		box_width = maxf(box_width, font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT,
 				-1, TICK_FONT_SIZE).x)
-	box_width += 12.0
-	var line_height := TICK_FONT_SIZE + 4.0
-	var box_height := lines.size() * line_height + 8.0
-	var box_x := x + 10.0
+	box_width += 18.0
+	var line_height := TICK_FONT_SIZE + 6.0
+	var box_height := lines.size() * line_height + 12.0
+	var box_x := x + 14.0
 	if box_x + box_width > plot_rect.end.x:
-		box_x = x - 10.0 - box_width
-	var box_y := plot_rect.position.y + 6.0
+		box_x = x - 14.0 - box_width
+	var box_y := plot_rect.position.y + 8.0
 	draw_rect(Rect2(box_x, box_y, box_width, box_height), Color(0.0, 0.0, 0.0, 0.75))
 	for i in lines.size():
-		_draw_text(Vector2(box_x + 6.0, box_y + 4.0 + (i + 1) * line_height - 4.0),
+		_draw_text(Vector2(box_x + 9.0, box_y + 6.0 + (i + 1) * line_height - 5.0),
 				lines[i], TICK_FONT_SIZE, line_colors[i], HORIZONTAL_ALIGNMENT_LEFT)
 
 

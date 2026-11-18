@@ -23,20 +23,14 @@ var _load_buttons: Dictionary = {}  # slot -> Button
 
 
 func _init() -> void:
-	add_theme_constant_override("separation", 4)
-	var hint := Label.new()
-	hint.text = "Save your PID tuning, then load it later to re-run with the same seed. The previous run stays as a faded ghost on the plots."
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(200.0, 0.0)
-	hint.add_theme_font_size_override("font_size", 13)
-	hint.add_theme_color_override("font_color", SignalColors.PLOT_AXIS_TEXT)
-	add_child(hint)
+	add_theme_constant_override("separation", 6)
+	add_child(UiStyle.make_hint("Save a tuning; Load + rerun replays it with the same seed. The old run stays as a faded ghost."))
 	for slot in SLOT_NAMES:
 		var row := HBoxContainer.new()
 		add_child(row)
 		var name_label := Label.new()
 		name_label.text = slot
-		name_label.custom_minimum_size = Vector2(20.0, 0.0)
+		name_label.custom_minimum_size = Vector2(30.0, 0.0)
 		row.add_child(name_label)
 		var save_button := Button.new()
 		save_button.text = "Save"
@@ -56,8 +50,8 @@ func _init() -> void:
 		summary.text = "(empty)"
 		summary.clip_text = true
 		summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		summary.add_theme_font_size_override("font_size", 13)
-		summary.add_theme_color_override("font_color", SignalColors.PLOT_AXIS_TEXT)
+		summary.add_theme_font_size_override("font_size", UiStyle.HINT)
+		summary.add_theme_color_override("font_color", UiStyle.HINT_COLOR)
 		row.add_child(summary)
 		_summaries[slot] = summary
 

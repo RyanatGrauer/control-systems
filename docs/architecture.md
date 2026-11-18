@@ -143,6 +143,17 @@ The bottom area has the output chart on the left and tabs on the right: Command,
 * **Equations** (`ui/equations_view.gd`) shows `Plant.get_equation_text()` and `Controller.get_equation_text()`: the ODE and the discrete PID update with the current numbers substituted in. It refreshes 8× per second. Each plant writes its own maths next to its code (override `get_equation_text`; the base class falls back to listing the state and its rate of change). The ODE uses `Simulation.plant_input`, the input after any dead time.
 * Transfer-function forms wait for the Advanced Math setting.
 
+## Screen size and text sizes
+
+The UI is designed at **1920×1080** (`window/size/viewport_*`) and stretched (`canvas_items`, aspect `expand`) to the real window. On a 1280×720 window, or a smaller itch.io embed, everything is drawn at 2/3 size, evenly.
+
+* Built-in controls are scaled by `gui/theme/default_theme_scale = 1.5`: default font 24 px, plus bigger checkboxes, scroll bars and margins.
+* **All other text sizes come from `ui/ui_style.gd` (`UiStyle`).** Nothing is smaller than `UiStyle.SMALLEST` (20 px at 1080p).
+  * Explanatory text uses `UiStyle.make_hint()`, which wraps it and uses the lighter hint colour.
+  * Long explanations that aren't needed on screen are tooltips (e.g. the motion-profile checkbox).
+* Custom-drawn controls (charts, term bars, block diagram) take their fonts from `UiStyle` and their geometry from their own constants, which are sized for 1080p.
+* **When you add UI, use `UiStyle`, not literal font sizes.**
+
 ## Presenter mode and graphics (stage 18)
 
 `ui/display_settings.gd` (`DisplaySettings`) holds app-wide display choices as static variables.
@@ -152,7 +163,7 @@ The bottom area has the output chart on the left and tabs on the right: Command,
   * Sets the window's `content_scale_factor` to 1.25.
   * Plots get 1.7× thicker lines and black backgrounds; the page background turns black.
   * The advanced side-panel sections are hidden (snapshots, plant parameters, simulation settings, save).
-  * The toolbar drops Seed and the "Time scale" title so it still fits. `test_presenter_layout_fits` checks the whole layout's minimum size against 1280×720 / 1.25. **If you add toolbar items, run that test.**
+  * The toolbar drops Seed and the "Time scale" title so it still fits. `test_presenter_layout_fits` checks the whole layout's minimum size against 1920×1080 / 1.25. **If you add toolbar items, run that test.**
 * **Setpoint ghost:** `plants/common/ghost.gdshader` gives a rim glow and a slow pulse. `make_ghost_material()` falls back to a flat colour when the effect is off.
 * **Saturation highlight:** while the actuator or the PID's own limit clips the command, the plant view shows a red "SATURATED" badge, and the Diagram tab turns the actuator red. `PlantVisual3D.show_saturation()` is a hook for plant-specific cues.
 

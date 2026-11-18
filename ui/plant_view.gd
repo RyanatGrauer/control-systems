@@ -36,14 +36,14 @@ var _drag_distance: float = 0.0
 
 
 func _init() -> void:
-	custom_minimum_size = Vector2(320.0, 260.0)
-	add_theme_constant_override("separation", 4)
+	custom_minimum_size = Vector2(480.0, 390.0)
+	add_theme_constant_override("separation", 6)
 
 	_caption = Label.new()
 	_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_caption.custom_minimum_size = Vector2(200.0, 0.0)
-	_caption.add_theme_font_size_override("font_size", 14)
-	_caption.add_theme_color_override("font_color", SignalColors.PLOT_AXIS_TEXT)
+	_caption.custom_minimum_size = Vector2(300.0, 0.0)
+	_caption.add_theme_font_size_override("font_size", UiStyle.HINT)
+	_caption.add_theme_color_override("font_color", UiStyle.HINT_COLOR)
 	add_child(_caption)
 
 	_scene_area = Control.new()
@@ -74,7 +74,7 @@ func _init() -> void:
 	badge_style.bg_color = Color(0.75, 0.12, 0.12)
 	badge_style.set_corner_radius_all(4)
 	_saturation_badge.add_theme_stylebox_override("normal", badge_style)
-	_saturation_badge.position = Vector2(8.0, 8.0)
+	_saturation_badge.position = Vector2(12.0, 12.0)
 	_saturation_badge.visible = false
 	_saturation_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_scene_area.add_child(_saturation_badge)
@@ -82,13 +82,14 @@ func _init() -> void:
 	var reset_camera_button := Button.new()
 	reset_camera_button.text = "Reset camera"
 	reset_camera_button.focus_mode = Control.FOCUS_NONE
-	# Pin the button to the top-right corner of the scene, 8 px from the edges.
+	# Pin the button to the top-right corner of the scene, 12 px from the
+	# edges. It grows LEFT to fit its text, so it is never clipped.
 	reset_camera_button.anchor_left = 1.0
 	reset_camera_button.anchor_right = 1.0
-	reset_camera_button.offset_left = -128.0
-	reset_camera_button.offset_right = -8.0
-	reset_camera_button.offset_top = 8.0
-	reset_camera_button.offset_bottom = 40.0
+	reset_camera_button.offset_left = -12.0
+	reset_camera_button.offset_right = -12.0
+	reset_camera_button.offset_top = 12.0
+	reset_camera_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	reset_camera_button.pressed.connect(_on_reset_camera_pressed)
 	_scene_area.add_child(reset_camera_button)
 

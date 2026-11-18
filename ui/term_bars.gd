@@ -12,10 +12,11 @@
 class_name TermBars
 extends Control
 
-const ROW_HEIGHT: float = 22.0
-const LABEL_WIDTH: float = 40.0
-const VALUE_WIDTH: float = 74.0
-const FONT_SIZE: int = 14
+const ROW_HEIGHT: float = 32.0
+const LABEL_WIDTH: float = 60.0
+const VALUE_WIDTH: float = 120.0
+const FONT_SIZE: int = UiStyle.HINT
+const TEXT_BASELINE: float = 24.0  # from the top of a row
 
 const ROW_COUNT: int = 5
 
@@ -28,7 +29,7 @@ var _colors: Array[Color] = [SignalColors.P_TERM, SignalColors.I_TERM,
 
 
 func _init() -> void:
-	custom_minimum_size = Vector2(200.0, ROW_HEIGHT * ROW_COUNT + 4.0)
+	custom_minimum_size = Vector2(300.0, ROW_HEIGHT * ROW_COUNT + 4.0)
 
 
 func set_terms(terms: Dictionary, full_scale: float, unit: String) -> void:
@@ -49,18 +50,18 @@ func _draw() -> void:
 	for row in ROW_COUNT:
 		var top := row * ROW_HEIGHT
 		var value := _values[row]
-		draw_string(font, Vector2(4.0, top + 16.0), _labels[row], HORIZONTAL_ALIGNMENT_LEFT,
+		draw_string(font, Vector2(6.0, top + TEXT_BASELINE), _labels[row], HORIZONTAL_ALIGNMENT_LEFT,
 				-1, FONT_SIZE, _colors[row])
 		# Bars beyond full scale are clipped and drawn with a marker at the end.
 		var fraction := clampf(value / _full_scale, -1.0, 1.0)
 		var length := fraction * bar_width * 0.5
-		var bar := Rect2(minf(center_x, center_x + length), top + 4.0, absf(length), ROW_HEIGHT - 8.0)
+		var bar := Rect2(minf(center_x, center_x + length), top + 6.0, absf(length), ROW_HEIGHT - 12.0)
 		draw_rect(bar, _colors[row])
 		if absf(value) > _full_scale:
 			var edge_x := center_x + signf(value) * bar_width * 0.5
 			draw_line(Vector2(edge_x, top + 2.0), Vector2(edge_x, top + ROW_HEIGHT - 2.0),
 					SignalColors.WARNING_TEXT, 3.0)
-		draw_string(font, Vector2(size.x - VALUE_WIDTH + 4.0, top + 16.0),
+		draw_string(font, Vector2(size.x - VALUE_WIDTH + 4.0, top + TEXT_BASELINE),
 				"%s %s" % [NumberFormat.significant(value, 3), _unit],
 				HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, SignalColors.PLOT_AXIS_TEXT)
 

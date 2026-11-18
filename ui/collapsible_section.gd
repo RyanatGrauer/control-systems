@@ -18,7 +18,7 @@ var _title: String
 
 func _init(title: String, start_open: bool = true) -> void:
 	_title = title
-	add_theme_constant_override("separation", 6)
+	add_theme_constant_override("separation", 9)
 
 	_header = Button.new()
 	_header.toggle_mode = true
@@ -29,7 +29,7 @@ func _init(title: String, start_open: bool = true) -> void:
 	add_child(_header)
 
 	body = VBoxContainer.new()
-	body.add_theme_constant_override("separation", 8)
+	body.add_theme_constant_override("separation", 12)
 	add_child(body)
 	_on_header_toggled(start_open)
 

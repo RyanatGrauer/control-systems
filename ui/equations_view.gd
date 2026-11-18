@@ -26,8 +26,8 @@ func setup(simulation: Simulation) -> void:
 	scroll_active = true
 	selection_enabled = true
 	focus_mode = Control.FOCUS_NONE
-	add_theme_font_size_override("normal_font_size", 14)
-	add_theme_font_size_override("bold_font_size", 14)
+	add_theme_font_size_override("normal_font_size", UiStyle.HINT + 1)
+	add_theme_font_size_override("bold_font_size", UiStyle.HINT + 1)
 	refresh()
 
 

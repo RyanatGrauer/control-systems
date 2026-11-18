@@ -28,6 +28,8 @@ grep -rn "TUNABLE" --include=*.gd --include=*.gdshader .
 | `plants/flywheel/flywheel_visual.gd` | Wheel size/position, speed at which motion blur appears |
 | `plants/common/orbit_camera.gd` | Orbit speed, zoom step, pitch and zoom limits |
 | `plants/common/grid_floor.gdshader` | Floor colours, grid spacing, fade distance |
+| `ui/ui_style.gd` | Every text size (body, large readouts, hints, chart and diagram text), the smallest allowed size, hint colour, plot line-width scale |
+| `project.godot` | Design resolution (1920×1080) and `gui/theme/default_theme_scale` (1.5) |
 | `ui/display_settings.gd` | What each graphics preset turns on/off; presenter UI scale (1.25×), line scale (1.7×) and colours |
 | `ui/display_panel.gd` | 3D resolution choices (50/75/100%) |
 | `plants/common/ghost.gdshader` | Ghost rim-glow strength, pulse size and speed |

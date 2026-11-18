@@ -24,7 +24,7 @@ var _actual_rate_label: Label
 
 func setup(simulation: Simulation) -> void:
 	_simulation = simulation
-	add_theme_constant_override("separation", 8)
+	add_theme_constant_override("separation", 12)
 
 	add_child(_make_label("Integrator"))
 	var integrator_menu := OptionButton.new()
@@ -55,7 +55,7 @@ func setup(simulation: Simulation) -> void:
 	controller_rate_slider.value_changed_si.connect(_on_controller_rate_changed)
 
 	_actual_rate_label = Label.new()
-	_actual_rate_label.add_theme_font_size_override("font_size", 13)
+	_actual_rate_label.add_theme_font_size_override("font_size", UiStyle.HINT)
 	add_child(_actual_rate_label)
 	_update_actual_rate_label()
 

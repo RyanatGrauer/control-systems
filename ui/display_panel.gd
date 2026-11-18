@@ -31,7 +31,7 @@ var _scale_menu: OptionButton
 
 
 func setup() -> void:
-	add_theme_constant_override("separation", 6)
+	add_theme_constant_override("separation", 9)
 	_presenter_check = _add_check("Presenter mode (F2)",
 			"Bigger text, thicker lines, black plot backgrounds, fewer panels: for projectors.")
 	_presenter_check.toggled.connect(func(on: bool) -> void: presenter_toggled.emit(on))

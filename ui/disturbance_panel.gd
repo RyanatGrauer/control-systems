@@ -40,7 +40,7 @@ static func apply_defaults(simulation: Simulation) -> void:
 
 func setup(simulation: Simulation) -> void:
 	_simulation = simulation
-	add_theme_constant_override("separation", 6)
+	add_theme_constant_override("separation", 9)
 	var generator := simulation.disturbance_generator
 	var load_info := simulation.plant.get_disturbance_definition()
 	var load_max := maxf(absf(load_info.max_value), absf(load_info.min_value))
@@ -135,13 +135,7 @@ func _load_info(like: QuantityInfo, key: String, title: String, min_si: float,
 
 
 func _make_hint(text: String) -> Label:
-	var hint := Label.new()
-	hint.text = text
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(200.0, 0.0)
-	hint.add_theme_font_size_override("font_size", 13)
-	hint.add_theme_color_override("font_color", SignalColors.PLOT_AXIS_TEXT)
-	return hint
+	return UiStyle.make_hint(text)
 
 
 # One checkbox plus its sliders (hidden while the box is off).

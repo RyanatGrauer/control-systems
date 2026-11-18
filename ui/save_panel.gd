@@ -33,11 +33,11 @@ var _file_dialog: FileDialog
 func setup(store: SaveStore, make_csv: Callable) -> void:
 	_store = store
 	_make_csv = make_csv
-	add_theme_constant_override("separation", 6)
+	add_theme_constant_override("separation", 9)
 
 	_add_button("Export run (CSV)", "Download this run's data (time, setpoint, measurement, terms...) for a spreadsheet or Python.",
 			_on_export_csv)
-	_add_hint("Your tunings and settings save automatically on this computer/browser. Export a backup now and then: clearing browser data deletes it.")
+	_add_hint("Saving is automatic. Export a backup now and then: clearing browser data deletes it.")
 	var file_row := HBoxContainer.new()
 	add_child(file_row)
 	_add_button("Export save", "Download your save as a .json file (backup or move to another computer).",
@@ -53,11 +53,7 @@ func setup(store: SaveStore, make_csv: Callable) -> void:
 			func() -> void: _reset_dialog.popup_centered())
 	reset_button.add_theme_color_override("font_color", SignalColors.WARNING_TEXT)
 
-	_status = Label.new()
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.custom_minimum_size = Vector2(200.0, 0.0)
-	_status.add_theme_font_size_override("font_size", 13)
-	_status.add_theme_color_override("font_color", SignalColors.PLOT_AXIS_TEXT)
+	_status = UiStyle.make_hint("")
 	add_child(_status)
 	_build_dialogs()
 
@@ -93,13 +89,13 @@ func _on_copy_code() -> void:
 	DisplayServer.clipboard_set(code)
 	# Also show it, in case the browser blocked clipboard access.
 	_copy_box.text = code
-	_copy_dialog.popup_centered(Vector2i(520, 260))
+	_copy_dialog.popup_centered(Vector2i(800, 400))
 	show_status("Save code copied to the clipboard.")
 
 
 func _on_paste_code() -> void:
 	_paste_box.text = ""
-	_paste_dialog.popup_centered(Vector2i(520, 260))
+	_paste_dialog.popup_centered(Vector2i(800, 400))
 	_paste_box.grab_focus()
 
 
@@ -189,7 +185,7 @@ func _make_code_box(dialog: AcceptDialog, hint: String) -> TextEdit:
 	column.add_child(label)
 	var box := TextEdit.new()
 	box.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
-	box.custom_minimum_size = Vector2(480.0, 160.0)
+	box.custom_minimum_size = Vector2(740.0, 240.0)
 	column.add_child(box)
 	dialog.add_child(column)
 	return box
@@ -208,10 +204,4 @@ func _add_button(text: String, tooltip: String, on_pressed: Callable,
 
 
 func _add_hint(text: String) -> void:
-	var label := Label.new()
-	label.text = text
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.custom_minimum_size = Vector2(200.0, 0.0)
-	label.add_theme_font_size_override("font_size", 13)
-	label.add_theme_color_override("font_color", SignalColors.PLOT_AXIS_TEXT)
-	add_child(label)
+	add_child(UiStyle.make_hint(text))

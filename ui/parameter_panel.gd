@@ -17,7 +17,7 @@ var _sliders: Dictionary = {}  # parameter key -> LabeledSlider
 
 func setup(plant: Plant) -> void:
 	_plant = plant
-	add_theme_constant_override("separation", 8)
+	add_theme_constant_override("separation", 12)
 	for info in plant.get_parameter_definitions():
 		var slider := LabeledSlider.new()
 		add_child(slider)

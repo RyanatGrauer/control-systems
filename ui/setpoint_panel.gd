@@ -37,7 +37,7 @@ const SETTINGS_FOR_PATTERN: Dictionary = {
 func setup(simulation: Simulation) -> void:
 	_simulation = simulation
 	_generator = simulation.setpoint_generator
-	add_theme_constant_override("separation", 8)
+	add_theme_constant_override("separation", 12)
 
 	_pattern_menu = OptionButton.new()
 	_pattern_menu.focus_mode = Control.FOCUS_NONE
@@ -57,7 +57,7 @@ func setup(simulation: Simulation) -> void:
 	_build_motion_profile_controls()
 
 	_readout = Label.new()
-	_readout.add_theme_font_size_override("font_size", 15)
+	_readout.add_theme_font_size_override("font_size", UiStyle.LARGE)
 	add_child(_readout)
 	_update_visible_settings()
 
@@ -73,14 +73,9 @@ func _build_motion_profile_controls() -> void:
 	check_box.text = "Smooth with a motion profile"
 	check_box.focus_mode = Control.FOCUS_NONE
 	check_box.button_pressed = _simulation.use_motion_profile
+	# Explanation as a tooltip, not on-screen fine print.
+	check_box.tooltip_text = "Instead of jumping, the target speeds up, cruises and slows down (a trapezoid). Gives kV / kA feedforward something to work with."
 	add_child(check_box)
-	var hint := Label.new()
-	hint.text = "Instead of jumping, the target speeds up, cruises and slows down (a trapezoid). Gives kV / kA feedforward something to work with."
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(200.0, 0.0)
-	hint.add_theme_font_size_override("font_size", 13)
-	hint.add_theme_color_override("font_color", SignalColors.PLOT_AXIS_TEXT)
-	add_child(hint)
 
 	var sliders := VBoxContainer.new()
 	sliders.visible = check_box.button_pressed

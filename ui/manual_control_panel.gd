@@ -26,14 +26,10 @@ var _command_slider: LabeledSlider
 func setup(simulation: Simulation, manual_controller: ManualController) -> void:
 	_simulation = simulation
 	_manual_controller = manual_controller
-	add_theme_constant_override("separation", 8)
+	add_theme_constant_override("separation", 12)
 
 	var input_info := simulation.plant.get_input_definition()
-	var hint := Label.new()
-	hint.text = "You are the controller. Move the %s slider (or hold Up/Down) to keep the measurement (blue) on the setpoint (orange dashes)." % input_info.display_name.to_lower()
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(200.0, 0.0)
-	add_child(hint)
+	add_child(UiStyle.make_hint("You are the controller: move the %s slider (or hold Up/Down) to keep blue on the orange dashes." % input_info.display_name.to_lower()))
 
 	_command_slider = LabeledSlider.new()
 	add_child(_command_slider)

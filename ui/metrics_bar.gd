@@ -23,7 +23,7 @@ var _time_until_update: float = 0.0
 func setup(simulation: Simulation) -> void:
 	_simulation = simulation
 	_label = Label.new()
-	_label.add_theme_font_size_override("font_size", 14)
+	_label.add_theme_font_size_override("font_size", UiStyle.HINT)
 	_label.tooltip_text = "Measured on the TRUE output, for the response to the last setpoint change.\nRise: 10% to 90% of the way to the target. Overshoot: % past the target.\nSettling: time to stay within 2% of the step. SS error: average error over the last 0.5 s.\nIAE: integral of |error| (smaller is better). Effort: integral of input squared."
 	_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(_label)

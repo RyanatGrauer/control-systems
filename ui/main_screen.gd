@@ -26,7 +26,7 @@ enum ControllerMode { MANUAL, PID }
 # TUNABLE: plot time-window choices (seconds) and the default.
 const PLOT_WINDOW_CHOICES_S: Array[float] = [5.0, 10.0, 20.0, 30.0, 60.0]
 const DEFAULT_PLOT_WINDOW_INDEX: int = 1
-const SIDE_PANEL_MIN_WIDTH: float = 350.0
+const SIDE_PANEL_MIN_WIDTH: float = 520.0
 # TUNABLE: ghost runs (README 7.3): how many to keep, and the shortest run
 # worth keeping (shorter runs are just restarts).
 const MAX_GHOSTS: int = 3
@@ -429,11 +429,11 @@ func _build_layout() -> void:
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		margin.add_theme_constant_override(side, 6)
+		margin.add_theme_constant_override(side, 9)
 	add_child(margin)
 
 	var page := VBoxContainer.new()
-	page.add_theme_constant_override("separation", 6)
+	page.add_theme_constant_override("separation", 9)
 	margin.add_child(page)
 
 	var titles := PackedStringArray()
@@ -483,7 +483,7 @@ func _build_side_panel() -> Control:
 
 	var column := VBoxContainer.new()
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	column.add_theme_constant_override("separation", 12)
+	column.add_theme_constant_override("separation", 18)
 	scroll.add_child(column)
 
 	# --- Controller: mode picker + the matching panel ---
@@ -583,11 +583,11 @@ func _build_side_panel() -> Control:
 func _build_plot_area() -> Control:
 	var area := VBoxContainer.new()
 	area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	area.custom_minimum_size = Vector2(0.0, 220.0)
+	area.custom_minimum_size = Vector2(0.0, 330.0)
 
 	# Plot options row.
 	var options := HBoxContainer.new()
-	options.add_theme_constant_override("separation", 10)
+	options.add_theme_constant_override("separation", 15)
 	area.add_child(options)
 
 	var window_label := Label.new()
@@ -623,14 +623,14 @@ func _build_plot_area() -> Control:
 
 	var hint := Label.new()
 	hint.text = "Hover to read values; pause and drag to scrub."
-	hint.add_theme_color_override("font_color", SignalColors.PLOT_AXIS_TEXT)
-	hint.add_theme_font_size_override("font_size", 13)
+	hint.add_theme_color_override("font_color", UiStyle.HINT_COLOR)
+	hint.add_theme_font_size_override("font_size", UiStyle.HINT)
 	options.add_child(hint)
 
 	# Output chart on the left; command / PID terms / error as tabs on the right.
 	var charts := HBoxContainer.new()
 	charts.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	charts.add_theme_constant_override("separation", 6)
+	charts.add_theme_constant_override("separation", 9)
 	area.add_child(charts)
 
 	var output_info := _simulation.plant.get_output_definition()
@@ -663,11 +663,11 @@ func _build_plot_area() -> Control:
 	notes.scroll_active = true
 	notes.selection_enabled = true
 	notes.focus_mode = Control.FOCUS_NONE
-	notes.add_theme_font_size_override("normal_font_size", 15)
+	notes.add_theme_font_size_override("normal_font_size", UiStyle.BODY)
 	var notes_margin := MarginContainer.new()
 	notes_margin.name = "Notes"
 	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		notes_margin.add_theme_constant_override(side, 10)
+		notes_margin.add_theme_constant_override(side, 15)
 	notes_margin.add_child(notes)
 	tabs.add_child(notes_margin)
 

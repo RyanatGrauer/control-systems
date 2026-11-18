@@ -23,9 +23,11 @@ signal block_clicked(block_id: String)
 const FORWARD_Y: float = 0.36
 const FEEDBACK_Y: float = 0.82
 const BLOCK_HEIGHT: float = 0.30
-const VALUE_FONT_SIZE: int = 13
-const BLOCK_FONT_SIZE: int = 14
-const SMALL_FONT_SIZE: int = 11
+const BLOCK_WIDTH: float = 0.125     # controller / actuator / plant / sensor
+const SETPOINT_WIDTH: float = 0.105
+const VALUE_FONT_SIZE: int = UiStyle.DIAGRAM_VALUE
+const BLOCK_FONT_SIZE: int = UiStyle.DIAGRAM_BLOCK
+const SMALL_FONT_SIZE: int = UiStyle.SMALLEST
 const ACTIVE_BORDER: Color = Color("#F0E442")
 const SATURATED_FILL: Color = Color(0.55, 0.10, 0.10)
 const BLOCK_FILL: Color = Color(0.16, 0.17, 0.20)
@@ -35,7 +37,7 @@ var _block_rects: Dictionary = {}  # block id -> Rect2 (for clicks)
 
 
 func _init() -> void:
-	custom_minimum_size = Vector2(320.0, 150.0)
+	custom_minimum_size = Vector2(480.0, 225.0)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	tooltip_text = "Click a block to open its settings."
 
@@ -74,18 +76,33 @@ func _draw() -> void:
 	var forward_y := h * FORWARD_Y
 	var feedback_y := h * FEEDBACK_Y
 	var block_height := h * BLOCK_HEIGHT
-	var block_width := w * 0.13
 	_block_rects.clear()
 
-	# Block centres (x as a fraction of the width).
-	var setpoint_rect := _block_rect("setpoint", Vector2(w * 0.07, forward_y), Vector2(w * 0.11, block_height))
-	var sum_center := Vector2(w * 0.205, forward_y)
-	var sum_radius := minf(h * 0.07, 12.0)
-	var controller_rect := _block_rect("controller", Vector2(w * 0.37, forward_y), Vector2(block_width, block_height))
-	var actuator_rect := _block_rect("actuator", Vector2(w * 0.58, forward_y), Vector2(block_width, block_height))
-	var plant_rect := _block_rect("plant", Vector2(w * 0.80, forward_y), Vector2(block_width, block_height))
-	var sensor_rect := _block_rect("sensor", Vector2(w * 0.58, feedback_y), Vector2(block_width, block_height * 0.85))
-	var output_x := w * 0.985
+	# Left to right: setpoint, sum, controller, actuator, plant, output arrow,
+	# with EQUAL gaps between them so every wire has the same room for its
+	# label (the labels are what students read).
+	var margin := 8.0
+	var setpoint_width := w * SETPOINT_WIDTH
+	var block_width := w * BLOCK_WIDTH
+	var sum_radius := minf(h * 0.07, 18.0)
+	var gap := (w - 2.0 * margin - setpoint_width - 2.0 * sum_radius - 3.0 * block_width) / 5.0
+	var x := margin
+	var setpoint_rect := _block_rect("setpoint", Vector2(x + setpoint_width * 0.5, forward_y),
+			Vector2(setpoint_width, block_height))
+	x += setpoint_width + gap
+	var sum_center := Vector2(x + sum_radius, forward_y)
+	x += 2.0 * sum_radius + gap
+	var controller_rect := _block_rect("controller", Vector2(x + block_width * 0.5, forward_y),
+			Vector2(block_width, block_height))
+	x += block_width + gap
+	var actuator_rect := _block_rect("actuator", Vector2(x + block_width * 0.5, forward_y),
+			Vector2(block_width, block_height))
+	x += block_width + gap
+	var plant_rect := _block_rect("plant", Vector2(x + block_width * 0.5, forward_y),
+			Vector2(block_width, block_height))
+	var output_x := w - margin
+	var sensor_rect := _block_rect("sensor", Vector2(actuator_rect.get_center().x, feedback_y),
+			Vector2(block_width, block_height * 0.85))
 
 	# --- wires (drawn first, blocks on top) ---
 	var r_text := _shown(output_info, _simulation.setpoint)
@@ -103,27 +120,27 @@ func _draw() -> void:
 	_arrow(Vector2(controller_rect.end.x, forward_y), Vector2(actuator_rect.position.x, forward_y),
 			SignalColors.COMMAND, "u", u_text)
 	_arrow(Vector2(actuator_rect.end.x, forward_y), Vector2(plant_rect.position.x, forward_y),
-			SignalColors.APPLIED_INPUT, "u applied", applied_text)
+			SignalColors.APPLIED_INPUT, "applied", applied_text)
 	_arrow(Vector2(plant_rect.end.x, forward_y), Vector2(output_x, forward_y),
 			SignalColors.TRUE_OUTPUT, "output", true_text)
 	# Feedback: down from the output, left into the sensor, left and up into (-).
 	var feedback_color := SignalColors.MEASUREMENT
 	draw_line(Vector2(output_x - 10.0, forward_y), Vector2(output_x - 10.0, feedback_y),
-			SignalColors.TRUE_OUTPUT, 2.0)
+			SignalColors.TRUE_OUTPUT, 3.0)
 	_arrow(Vector2(output_x - 10.0, feedback_y), Vector2(sensor_rect.end.x, feedback_y),
 			SignalColors.TRUE_OUTPUT, "", "")
 	draw_line(Vector2(sensor_rect.position.x, feedback_y), Vector2(sum_center.x, feedback_y),
-			feedback_color, 2.0)
+			feedback_color, 3.0)
 	_arrow(Vector2(sum_center.x, feedback_y), sum_center + Vector2(0.0, sum_radius),
 			feedback_color, "", "")
-	_text(Vector2((sensor_rect.position.x + sum_center.x) * 0.5, feedback_y - 6.0),
+	_text(Vector2((sensor_rect.position.x + sum_center.x) * 0.5, feedback_y - 9.0),
 			"y = " + y_text, VALUE_FONT_SIZE, feedback_color)
 	# Disturbance from above into the plant.
-	var d_start := Vector2(plant_rect.get_center().x, maxf(forward_y - block_height * 0.5 - h * 0.2, 14.0))
+	var d_start := Vector2(plant_rect.get_center().x, maxf(forward_y - block_height * 0.5 - h * 0.2, 24.0))
 	_arrow(d_start, Vector2(plant_rect.get_center().x, plant_rect.position.y),
 			SignalColors.DISTURBANCE, "", "")
 	_text(d_start + Vector2(0.0, -3.0), "d = " + d_text, VALUE_FONT_SIZE, SignalColors.DISTURBANCE)
-	_block_rects["disturbance"] = Rect2(d_start - Vector2(40.0, 16.0), Vector2(80.0, 20.0))
+	_block_rects["disturbance"] = Rect2(d_start - Vector2(60.0, 26.0), Vector2(120.0, 30.0))
 
 	# --- summing junction ---
 	draw_circle(sum_center, sum_radius, BLOCK_FILL)
@@ -144,7 +161,7 @@ func _draw() -> void:
 			if pid != null else "Manual (you)", false, clipped)
 	_block(actuator_rect, "Actuator", actuator_effects if actuator_effects != "" else "ideal",
 			actuator_effects != "", _simulation.actuator.is_saturated)
-	_block(plant_rect, "Plant", plant.get_display_name(), false, false)
+	_block(plant_rect, "Plant", "", false, false)  # its name is in the toolbar
 	_block(sensor_rect, "Sensor", sensor_effects if sensor_effects != "" else "ideal",
 			sensor_effects != "", false)
 
@@ -158,28 +175,28 @@ func _block_rect(block_id: String, center: Vector2, block_size: Vector2) -> Rect
 func _block(rect: Rect2, title: String, subtitle: String, active: bool, saturated: bool) -> void:
 	draw_rect(rect, SATURATED_FILL if saturated else BLOCK_FILL)
 	var border := SignalColors.WARNING_TEXT if saturated else (ACTIVE_BORDER if active else SignalColors.PLOT_AXIS_TEXT)
-	draw_rect(rect, border, false, 3.0 if (active or saturated) else 1.5)
+	draw_rect(rect, border, false, 4.0 if (active or saturated) else 2.0)
 	var center := rect.get_center()
-	_text(center + Vector2(0.0, -2.0), title, BLOCK_FONT_SIZE, Color.WHITE, rect.size.x - 6.0)
+	_text(center + Vector2(0.0, -3.0), title, BLOCK_FONT_SIZE, Color.WHITE, rect.size.x - 8.0)
 	var sub := "SATURATED" if saturated and title == "Actuator" else subtitle
-	_text(center + Vector2(0.0, 14.0), sub, SMALL_FONT_SIZE, SignalColors.PLOT_AXIS_TEXT, rect.size.x - 6.0)
+	_text(center + Vector2(0.0, 21.0), sub, SMALL_FONT_SIZE, SignalColors.PLOT_AXIS_TEXT, rect.size.x - 8.0)
 
 
 # Line with an arrowhead at `to`. For horizontal wires, the signal's symbol
 # goes above the middle and its live value below, both shrunk to the wire.
 func _arrow(from: Vector2, to: Vector2, color: Color, symbol: String, value: String) -> void:
-	draw_line(from, to, color, 2.0, true)
+	draw_line(from, to, color, 3.0, true)
 	var direction := (to - from).normalized()
 	if direction == Vector2.ZERO:
 		return
 	var side := Vector2(-direction.y, direction.x)
-	draw_colored_polygon(PackedVector2Array([to, to - direction * 8.0 + side * 4.5,
-			to - direction * 8.0 - side * 4.5]), color)
+	draw_colored_polygon(PackedVector2Array([to, to - direction * 12.0 + side * 7.0,
+			to - direction * 12.0 - side * 7.0]), color)
 	var room := absf(to.x - from.x) - 4.0
 	if symbol != "":
-		_text((from + to) * 0.5 + Vector2(0.0, -5.0), symbol, VALUE_FONT_SIZE, color, room)
+		_text((from + to) * 0.5 + Vector2(0.0, -7.0), symbol, VALUE_FONT_SIZE, color, room)
 	if value != "":
-		_text((from + to) * 0.5 + Vector2(0.0, 15.0), value, SMALL_FONT_SIZE, color, room)
+		_text((from + to) * 0.5 + Vector2(0.0, 23.0), value, SMALL_FONT_SIZE, color, room)
 
 
 # Centred text, shrunk to fit `max_width` if given.
@@ -187,7 +204,7 @@ func _text(center_bottom: Vector2, text: String, font_size: int, color: Color,
 		max_width: float = -1.0) -> void:
 	var font := get_theme_default_font()
 	var fitted_size := font_size
-	while max_width > 0.0 and fitted_size > 8 \
+	while max_width > 0.0 and fitted_size > 14 \
 			and font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fitted_size).x > max_width:
 		fitted_size -= 1
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fitted_size).x

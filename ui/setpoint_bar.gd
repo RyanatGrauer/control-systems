@@ -32,7 +32,7 @@ func setup(simulation: Simulation) -> void:
 	add_theme_stylebox_override("panel", background)
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
+	row.add_theme_constant_override("separation", 18)
 	add_child(row)
 
 	var output_info := simulation.plant.get_output_definition()
@@ -51,7 +51,7 @@ func setup(simulation: Simulation) -> void:
 	flip_button.tooltip_text = "Jump the setpoint between the start level and the target.\nPress again whenever the system has settled to see another step response."
 	flip_button.focus_mode = Control.FOCUS_NONE
 	flip_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	flip_button.custom_minimum_size = Vector2(0.0, 40.0)
+	flip_button.custom_minimum_size = Vector2(0.0, 60.0)
 	flip_button.pressed.connect(flip)
 	row.add_child(flip_button)
 

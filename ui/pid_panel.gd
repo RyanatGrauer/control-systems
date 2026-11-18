@@ -32,7 +32,7 @@ var _isa_label: Label
 func setup(simulation: Simulation, pid: PidController) -> void:
 	_simulation = simulation
 	_pid = pid
-	add_theme_constant_override("separation", 8)
+	add_theme_constant_override("separation", 12)
 
 	var formula := Label.new()
 	formula.text = "u = Kp·e + Ki·Σ(e·Δt) + Kd·Δe/Δt"
@@ -50,13 +50,7 @@ func setup(simulation: Simulation, pid: PidController) -> void:
 		_gain_sliders.append(slider)
 	select_gain(0)
 
-	var hint := Label.new()
-	hint.text = "Click a gain name or press P / I / D to select it; [ and ] nudge it."
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(200.0, 0.0)
-	hint.add_theme_font_size_override("font_size", 13)
-	hint.add_theme_color_override("font_color", SignalColors.PLOT_AXIS_TEXT)
-	add_child(hint)
+	add_child(UiStyle.make_hint("P / I / D keys select a gain; [ and ] nudge it."))
 
 	var input_info := simulation.plant.get_input_definition()
 	var limits := CheckBox.new()
@@ -275,10 +269,4 @@ func _add_toggle(box: Control, title: String, explanation: String, enabled: bool
 
 
 func _add_hint(box: Control, text: String) -> void:
-	var hint := Label.new()
-	hint.text = text
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(200.0, 0.0)
-	hint.add_theme_font_size_override("font_size", 13)
-	hint.add_theme_color_override("font_color", SignalColors.PLOT_AXIS_TEXT)
-	box.add_child(hint)
+	box.add_child(UiStyle.make_hint(text))

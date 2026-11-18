@@ -60,7 +60,7 @@ static func apply_defaults(simulation: Simulation) -> void:
 
 func setup(simulation: Simulation) -> void:
 	_simulation = simulation
-	add_theme_constant_override("separation", 6)
+	add_theme_constant_override("separation", 9)
 	var sensor := simulation.sensor
 	var actuator := simulation.actuator
 	var output_info := simulation.plant.get_output_definition()

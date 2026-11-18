@@ -127,7 +127,7 @@ func _title_text() -> String:
 
 
 func _build() -> void:
-	add_theme_constant_override("separation", 2)
+	add_theme_constant_override("separation", 3)
 	tooltip_text = _info.description
 
 	_title = Label.new()
@@ -153,7 +153,7 @@ func _build() -> void:
 	_slider.step = 1.0
 	# No keyboard focus: arrow keys and Space stay free for app shortcuts.
 	_slider.focus_mode = Control.FOCUS_NONE
-	_slider.custom_minimum_size = Vector2(120.0, 24.0)
+	_slider.custom_minimum_size = Vector2(180.0, 36.0)
 	_slider.value_changed.connect(_on_slider_moved)
 	_slider.drag_started.connect(_on_drag_started)
 	_slider.drag_ended.connect(_on_drag_ended)
@@ -162,7 +162,7 @@ func _build() -> void:
 	row.add_child(_make_nudge_button("+", 1.0))
 
 	_number_field = LineEdit.new()
-	_number_field.custom_minimum_size = Vector2(76.0, 0.0)
+	_number_field.custom_minimum_size = Vector2(115.0, 0.0)
 	_number_field.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_number_field.text_submitted.connect(_on_text_submitted)
 	_number_field.focus_exited.connect(_on_text_focus_lost)
@@ -173,7 +173,7 @@ func _make_nudge_button(text: String, direction: float) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(28.0, 28.0)
+	button.custom_minimum_size = Vector2(42.0, 42.0)
 	button.tooltip_text = "Fine adjust"
 	button.pressed.connect(nudge.bind(direction))
 	return button

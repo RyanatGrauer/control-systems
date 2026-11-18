@@ -243,7 +243,7 @@ func test_saturation_badge() -> void:
 
 
 # Presenter mode scales the UI up, so the layout's minimum size must still fit
-# the default 1280x720 window divided by the scale (or the right edge is cut off).
+# the 1920x1080 design size divided by the scale (or the right edge is cut off).
 func test_presenter_layout_fits() -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	var screen := MainScreenScene.instantiate()
@@ -251,7 +251,7 @@ func test_presenter_layout_fits() -> void:
 	_run_frames(screen, 3)
 	screen._set_presenter(true)
 	_run_frames(screen, 3)
-	var available := Vector2(1280.0, 720.0) / DisplaySettings.PRESENTER_UI_SCALE
+	var available := Vector2(1920.0, 1080.0) / DisplaySettings.PRESENTER_UI_SCALE
 	var needed: Vector2 = screen._background.get_parent().get_child(1).get_combined_minimum_size()
 	check_true(needed.x <= available.x, "presenter layout width %d fits %d" % [needed.x, available.x])
 	check_true(needed.y <= available.y, "presenter layout height %d fits %d" % [needed.y, available.y])
