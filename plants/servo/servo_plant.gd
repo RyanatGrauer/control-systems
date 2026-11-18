@@ -115,6 +115,12 @@ func get_pid_gain_definitions() -> Array[QuantityInfo]:
 	return make_pid_gain_definitions(2.0, 100.0, 0.0, 100.0, 0.0, 10.0)
 
 
+# TUNABLE: feedforward slider maxima. Ideal kV = 1/K ~ 0.102 V/(rad/s),
+# ideal kA = J*R/Kt = 0.2 V/(rad/s²).
+func get_feedforward_definitions() -> Array[QuantityInfo]:
+	return make_feedforward_definitions(2.0, 1.0, 2.0, 12.0)
+
+
 func get_visual_scene_path() -> String:
 	return "res://plants/servo/servo_visual.tscn"
 

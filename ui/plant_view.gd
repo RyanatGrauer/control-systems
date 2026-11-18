@@ -11,8 +11,8 @@
 #
 # INPUT
 #   Left-drag orbits the camera, mouse wheel zooms, "Reset camera" restores the
-#   default framing. (Plain left CLICK is reserved for "poke the plant"
-#   disturbances in stage 14.)
+#   default framing. A plain left CLICK (no drag) emits poked(+1) and a right
+#   click poked(-1): main_screen.gd turns that into a short disturbance.
 #
 # LAYOUT (top to bottom, so nothing ever covers the 3D scene)
 #   caption strip   "what's happening" text from Plant.get_description()
@@ -21,11 +21,16 @@
 class_name PlantView
 extends VBoxContainer
 
+signal poked(direction: float)
+
+const CLICK_SLOP_PIXELS: float = 5.0  # more movement than this = a drag, not a click
+
 var _viewport: SubViewport
 var _scene_area: Control
 var _caption: Label
 var _visual: PlantVisual3D
 var _is_orbiting: bool = false
+var _drag_distance: float = 0.0
 
 
 func _init() -> void:
@@ -113,7 +118,14 @@ func _on_scene_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var button := event as InputEventMouseButton
 		if button.button_index == MOUSE_BUTTON_LEFT:
+			if button.pressed:
+				_drag_distance = 0.0
+			elif _is_orbiting and _drag_distance < CLICK_SLOP_PIXELS:
+				poked.emit(1.0)
 			_is_orbiting = button.pressed
+			_scene_area.accept_event()
+		elif button.button_index == MOUSE_BUTTON_RIGHT and not button.pressed:
+			poked.emit(-1.0)
 			_scene_area.accept_event()
 		elif button.pressed and button.button_index == MOUSE_BUTTON_WHEEL_UP:
 			camera.zoom(1.0)
@@ -123,6 +135,7 @@ func _on_scene_input(event: InputEvent) -> void:
 			_scene_area.accept_event()
 	elif event is InputEventMouseMotion and _is_orbiting:
 		var motion := event as InputEventMouseMotion
+		_drag_distance += motion.relative.length()
 		camera.orbit(motion.relative)
 		_scene_area.accept_event()
 

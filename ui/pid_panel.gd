@@ -3,7 +3,9 @@
 # PURPOSE
 #   The PID controller panel (README 7.2, stage 6): Kp / Ki / Kd sliders with
 #   log scales, numeric fields and fine-adjust buttons, the output-limit switch,
-#   a "Reset integral" button, and live P / I / D term bars.
+#   a "Reset integral" button, live P / I / D term bars, and an "Advanced PID"
+#   section (stage 11) with one toggle per feature, each with a one-sentence
+#   explanation (README 6.1), plus the same gains shown in ISA form.
 #   All changes apply LIVE while the simulation runs.
 #
 # KEYBOARD (InputMap actions, for live demos)
@@ -24,6 +26,7 @@ var _pid: PidController
 var _gain_sliders: Array[LabeledSlider] = []
 var _selected_gain: int = 0
 var _term_bars: TermBars
+var _isa_label: Label
 
 
 func setup(simulation: Simulation, pid: PidController) -> void:
@@ -80,15 +83,22 @@ func setup(simulation: Simulation, pid: PidController) -> void:
 	_term_bars = TermBars.new()
 	add_child(_term_bars)
 
+	_build_feedforward_section()
+	_build_advanced_section()
+
 
 # Called by main_screen.gd every frame.
 func update_panel() -> void:
 	var input_info := _simulation.plant.get_input_definition()
 	var shown_terms := {}
-	for key in ["p", "i", "d", "sum"]:
+	for key in ["p", "i", "d", "ff", "sum"]:
 		shown_terms[key] = input_info.si_to_shown(_pid.get_term_contributions().get(key, 0.0))
 	_term_bars.set_terms(shown_terms, input_info.si_to_shown(input_info.max_value),
 			input_info.get_shown_unit())
+	if _isa_label.is_visible_in_tree():
+		_isa_label.text = "Same controller in ISA form:\nu = Kp·(e + (1/Ti)·Σ(e·Δt) + Td·Δe/Δt)\nKp = %s,  Ti = %s,  Td = %s" % [
+			NumberFormat.significant(_pid.proportional_gain, 3),
+			_format_time(_pid.get_integral_time()), _format_time(_pid.get_derivative_time())]
 
 
 func select_gain(index: int) -> void:
@@ -122,3 +132,149 @@ func _set_gain(si_value: float, index: int) -> void:
 
 func _on_limits_toggled(enabled: bool) -> void:
 	_pid.use_output_limits = enabled
+
+
+func _format_time(seconds: float) -> String:
+	if is_inf(seconds):
+		return "off"
+	return NumberFormat.significant(seconds, 3) + " s"
+
+
+# --- Feedforward section (stage 13) ---
+
+func _build_feedforward_section() -> void:
+	var section := CollapsibleSection.new("Feedforward", false)
+	add_child(section)
+	var box := section.body
+	var definitions := _simulation.plant.get_feedforward_definitions()
+	var setters: Array = [
+		func(v: float) -> void: _pid.static_gain = v,
+		func(v: float) -> void: _pid.velocity_gain = v,
+		func(v: float) -> void: _pid.acceleration_gain = v,
+		func(v: float) -> void: _pid.gravity_gain = v,
+	]
+	_add_toggle(box, "Use feedforward",
+			"FF = kS·sign(v) + kV·v + kA·a + kG. It pushes based on what the target is doing, before any error appears; PID only fixes what's left. (v, a = the target's speed and acceleration.)",
+			_pid.feedforward_enabled,
+			func(on: bool) -> void: _pid.feedforward_enabled = on,
+			definitions, setters)
+	var cosine := CheckBox.new()
+	cosine.text = "kG × cos(angle) (for arms)"
+	cosine.tooltip_text = "Gravity's pull on an arm changes with its angle: strongest when level, zero when straight up."
+	cosine.focus_mode = Control.FOCUS_NONE
+	cosine.button_pressed = _pid.gravity_uses_cosine
+	cosine.toggled.connect(func(on: bool) -> void: _pid.gravity_uses_cosine = on)
+	box.add_child(cosine)
+
+
+# --- Advanced PID section (stage 11) ---
+
+func _build_advanced_section() -> void:
+	var section := CollapsibleSection.new("Advanced PID", false)
+	add_child(section)
+	var box := section.body
+
+	_add_toggle(box, "Derivative on measurement",
+			"D reacts only to the measurement moving, so setpoint steps no longer cause a \"derivative kick\".",
+			_pid.derivative_on_measurement,
+			func(on: bool) -> void: _pid.derivative_on_measurement = on)
+
+	var filter_info := QuantityInfo.new("derivative_filter_tau", "D filter time constant (Tf)", "s") \
+		.with_display("ms", 1000.0).with_range(0.001, 1.0, _pid.derivative_filter_tau).with_log_slider()
+	_add_toggle(box, "Filter the D term",
+			"A low-pass filter on D so sensor noise isn't amplified. Bigger Tf = smoother but slower D.",
+			_pid.derivative_filter_enabled,
+			func(on: bool) -> void: _pid.derivative_filter_enabled = on,
+			[filter_info], [func(v: float) -> void: _pid.derivative_filter_tau = v])
+
+	# Anti-windup: a menu, plus the tracking gain for back-calculation.
+	var windup_menu := OptionButton.new()
+	windup_menu.focus_mode = Control.FOCUS_NONE
+	windup_menu.add_item("Anti-windup: none", PidController.AntiWindup.NONE)
+	windup_menu.add_item("Anti-windup: clamping", PidController.AntiWindup.CLAMPING)
+	windup_menu.add_item("Anti-windup: back-calculation", PidController.AntiWindup.BACK_CALCULATION)
+	windup_menu.select(_pid.anti_windup)
+	windup_menu.fit_to_longest_item = false  # don't widen the side panel
+	windup_menu.clip_text = true
+	box.add_child(windup_menu)
+	_add_hint(box, "While the output is stuck at a limit, stop the integral from piling up (\"windup\"), which causes big overshoot later. Needs output limits on.")
+	var tracking_slider := LabeledSlider.new()
+	box.add_child(tracking_slider)
+	tracking_slider.setup(QuantityInfo.new("back_calculation_gain", "Tracking gain (Kb)", "1/s") \
+		.with_range(0.1, 1000.0, _pid.back_calculation_gain).with_log_slider() \
+		.with_description("How fast back-calculation bleeds the integral back to the limit."),
+		_pid.back_calculation_gain)
+	tracking_slider.value_changed_si.connect(func(v: float) -> void: _pid.back_calculation_gain = v)
+	tracking_slider.visible = _pid.anti_windup == PidController.AntiWindup.BACK_CALCULATION
+	windup_menu.item_selected.connect(func(index: int) -> void:
+		_pid.anti_windup = index as PidController.AntiWindup
+		tracking_slider.visible = _pid.anti_windup == PidController.AntiWindup.BACK_CALCULATION)
+
+	var integral_menu := OptionButton.new()
+	integral_menu.focus_mode = Control.FOCUS_NONE
+	integral_menu.add_item("Integral: forward Euler (Ki·e·Δt)", PidController.IntegralMethod.FORWARD_EULER)
+	integral_menu.add_item("Integral: trapezoidal", PidController.IntegralMethod.TRAPEZOIDAL)
+	integral_menu.select(_pid.integral_method)
+	integral_menu.fit_to_longest_item = false
+	integral_menu.clip_text = true
+	integral_menu.tooltip_text = "Trapezoidal integrates the average of the last two errors (slightly more accurate)."
+	integral_menu.item_selected.connect(func(index: int) -> void:
+		_pid.integral_method = index as PidController.IntegralMethod)
+	box.add_child(integral_menu)
+
+	var weight_b := QuantityInfo.new("setpoint_weight_b", "P setpoint weight (b)", "") \
+		.with_range(0.0, 1.0, _pid.proportional_setpoint_weight)
+	var weight_c := QuantityInfo.new("setpoint_weight_c", "D setpoint weight (c)", "") \
+		.with_range(0.0, 1.0, _pid.derivative_setpoint_weight)
+	_add_toggle(box, "Setpoint weighting",
+			"P uses b·setpoint - measurement and D uses c·setpoint - measurement. b < 1 softens the response to setpoint steps without changing disturbance rejection.",
+			_pid.setpoint_weighting_enabled,
+			func(on: bool) -> void: _pid.setpoint_weighting_enabled = on,
+			[weight_b, weight_c],
+			[func(v: float) -> void: _pid.proportional_setpoint_weight = v,
+			func(v: float) -> void: _pid.derivative_setpoint_weight = v])
+
+	_add_toggle(box, "Bumpless switch (Manual / PID)",
+			"When you switch controllers, the new one starts from the old command instead of jumping. (Switching to PID needs Ki > 0.)",
+			_simulation.bumpless_transfer,
+			func(on: bool) -> void: _simulation.bumpless_transfer = on)
+
+	_isa_label = Label.new()
+	_isa_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_isa_label.custom_minimum_size = Vector2(200.0, 0.0)
+	_isa_label.tooltip_text = "Ti = Kp / Ki and Td = Kd / Kp. Same controller, written another way."
+	_isa_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	box.add_child(_isa_label)
+
+
+# A checkbox, its one-sentence explanation, and sliders shown while it's on.
+func _add_toggle(box: Control, title: String, explanation: String, enabled: bool,
+		set_enabled: Callable, infos: Array = [], setters: Array = []) -> void:
+	var check_box := CheckBox.new()
+	check_box.text = title
+	check_box.focus_mode = Control.FOCUS_NONE
+	check_box.button_pressed = enabled
+	box.add_child(check_box)
+	_add_hint(box, explanation)
+	var sliders := VBoxContainer.new()
+	sliders.visible = enabled
+	box.add_child(sliders)
+	for index in infos.size():
+		var info: QuantityInfo = infos[index]
+		var slider := LabeledSlider.new()
+		sliders.add_child(slider)
+		slider.setup(info, info.default_value)
+		slider.value_changed_si.connect(setters[index])
+	check_box.toggled.connect(func(on: bool) -> void:
+		set_enabled.call(on)
+		sliders.visible = on)
+
+
+func _add_hint(box: Control, text: String) -> void:
+	var hint := Label.new()
+	hint.text = text
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(200.0, 0.0)
+	hint.add_theme_font_size_override("font_size", 13)
+	hint.add_theme_color_override("font_color", SignalColors.PLOT_AXIS_TEXT)
+	box.add_child(hint)

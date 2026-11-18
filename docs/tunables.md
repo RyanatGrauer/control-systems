@@ -15,6 +15,14 @@ grep -rn "TUNABLE" --include=*.gd --include=*.gdshader .
 | `plants/mass_spring_damper/mass_spring_damper_visual.gd` | Scene layout, force-arrow scale, ruler range |
 | `plants/servo/servo_plant.gd` | Servo motor defaults, slider ranges, default PID gains |
 | `plants/servo/servo_visual.gd` | Dial size and position |
+| `plants/hotend/hotend_plant.gd`, `hotend_visual.gd` | Hotend defaults (C, R, dead time, room temperature), PID/FF ranges; glow colour scale |
+| `plants/elevator/elevator_plant.gd`, `elevator_visual.gd` | Rail height, stick threshold, elevator defaults, PID/FF ranges; layout |
+| `signal_blocks/sensor.gd` | Longest supported sensor delay (2 s) |
+| `signal_blocks/disturbance_generator.gd` | Poke duration (0.2 s) |
+| `ui/nonideality_panel.gd` | Default sizes and slider ranges for noise, resolution, delay, filter, deadband, slew (as fractions of each plant's range) |
+| `ui/disturbance_panel.gd` | Default step/random/poke sizes (fractions of the disturbance range) |
+| `ui/setpoint_panel.gd` | Default motion-profile speed and acceleration |
+| `core/simulation.gd` (also) | Longest supported plant dead time (10 s) |
 | `core/step_metrics.gd` | Rise thresholds (10/90%), settling band (2%), steady-state window (0.5 s) |
 | `ui/metrics_bar.gd` | How often metrics are recomputed (4 Hz) |
 | `plants/flywheel/flywheel_visual.gd` | Wheel size/position, speed at which motion blur appears |

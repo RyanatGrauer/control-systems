@@ -93,3 +93,56 @@ func test_every_catalog_plant_is_consistent() -> void:
 		for info in plant.get_parameter_definitions():
 			check_true(info.min_value <= info.default_value and info.default_value <= info.max_value,
 					"%s: %s default inside range" % [plant.get_display_name(), info.key])
+
+
+func test_hotend_heats_only_and_settles_to_rise_per_watt() -> void:
+	var plant := HotendPlant.new()
+	plant.set_parameter("dead_time", 0.0)
+	var derivative := plant.compute_derivative(PackedFloat64Array([25.0]), -40.0, 0.0, 0.0)
+	check_near(derivative[0], 0.0, 1e-12, "negative power can't cool below ambient")
+	# Steady state at 10 W: T = ambient + R*P = 25 + 60.
+	var simulation := Simulation.new(plant, ManualController.new())
+	(simulation.controller as ManualController).manual_command = 10.0
+	simulation.step_many(int(10.0 * plant.get_time_constant() * 1000.0))
+	check_near(simulation.get_true_output(), 85.0, 0.05, "T = ambient + R*P")
+
+
+func test_hotend_dead_time_delays_response() -> void:
+	var plant := HotendPlant.new()
+	plant.set_parameter("dead_time", 1.5)
+	var simulation := Simulation.new(plant, ManualController.new())
+	(simulation.controller as ManualController).manual_command = 40.0
+	simulation.step_many(1400)  # 1.4 s: heater has been on, but no heat has arrived
+	check_near(simulation.get_true_output(), 25.0, 1e-9, "nothing happens during the dead time")
+	simulation.step_many(600)
+	check_true(simulation.get_true_output() > 25.1, "heat arrives after the dead time")
+
+
+func test_elevator_gravity_stops_and_sticking() -> void:
+	var plant := ElevatorPlant.new()
+	var simulation := Simulation.new(plant, ManualController.new())
+	var manual := simulation.controller as ManualController
+	simulation.step_many(500)
+	check_near(simulation.get_true_output(), 0.0, 1e-12, "with no voltage it rests on the bottom stop")
+
+	manual.manual_command = 12.0
+	simulation.step_many(5000)
+	check_near(simulation.get_true_output(), ElevatorPlant.RAIL_HEIGHT, 1e-12, "full power hits the top stop")
+
+	# Holding voltage keeps it in place (static friction helps too).
+	manual.manual_command = plant.get_hold_voltage()
+	simulation.step_many(2000)
+	var held_at := simulation.get_true_output()
+	simulation.step_many(2000)
+	check_near(simulation.get_true_output(), held_at, 1e-6, "hold voltage holds the carriage")
+
+	# Slightly less than hold voltage, but within static friction: it sticks.
+	var stiction_volts := plant.get_parameter("static_friction") * plant.get_parameter("resistance") \
+			/ plant.get_parameter("motor_constant")
+	manual.manual_command = plant.get_hold_voltage() - 0.5 * stiction_volts
+	simulation.step_many(2000)
+	check_near(simulation.get_true_output(), held_at, 1e-4, "static friction holds it")
+	# At 0 V the motor's back-EMF brakes the fall (~0.2 m/s), so allow 10 s.
+	manual.manual_command = 0.0
+	simulation.step_many(10000)
+	check_near(simulation.get_true_output(), 0.0, 1e-12, "falls to the bottom stop when released")

@@ -69,3 +69,45 @@ func test_setpoint_bar_flip_and_sync() -> void:
 	check_equal(generator.target_level, old_target, "flipping twice restores the target")
 	_run_frames(screen, 5)
 	screen.queue_free()
+
+
+func test_nonideality_panel_builds_for_every_plant() -> void:
+	for index in PlantCatalog.get_count():
+		var simulation := Simulation.new(PlantCatalog.create_plant(index), PidController.new())
+		var panel := NonidealityPanel.new()
+		panel.setup(simulation)
+		check_true(not simulation.sensor.noise_enabled, "noise off by default")
+		check_true(simulation.sensor.noise_std > 0.0, "noise default scaled to plant")
+		check_true(simulation.actuator.saturation_max > simulation.actuator.saturation_min,
+				"saturation defaults to the input range")
+		panel.free()
+
+
+func test_disturbance_panel_and_poke() -> void:
+	for index in PlantCatalog.get_count():
+		var simulation := Simulation.new(PlantCatalog.create_plant(index), PidController.new())
+		var panel := DisturbancePanel.new()
+		panel.setup(simulation)
+		check_true(not simulation.disturbance_generator.step_enabled, "step load off by default")
+		simulation.step_many(100)
+		simulation.poke(1.0)
+		simulation.step_many(10)
+		check_true(simulation.disturbance != 0.0, "a poke produces a disturbance (plant %d)" % index)
+		simulation.step_many(200)
+		check_near(simulation.disturbance, 0.0, 1e-12, "the poke ends")
+		panel.free()
+
+
+func test_drift_restored_on_reset() -> void:
+	var plant := HotendPlant.new()
+	var simulation := Simulation.new(plant, ManualController.new())
+	var generator := simulation.disturbance_generator
+	generator.drift_enabled = true
+	generator.drift_key = "ambient_temperature"
+	generator.drift_factor = 2.0
+	generator.drift_time = 0.01
+	simulation.step_many(50)
+	check_near(plant.get_parameter("ambient_temperature"), 50.0, 1e-12, "drifted")
+	simulation.reset()
+	check_near(plant.get_parameter("ambient_temperature"), 25.0, 1e-12, "restored")
+	check_near(simulation.get_true_output(), 25.0, 1e-12, "initial state uses the restored value")

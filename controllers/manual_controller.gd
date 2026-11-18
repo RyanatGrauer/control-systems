@@ -25,3 +25,8 @@ func compute(_setpoint: float, _measurement: float, _dt: float) -> float:
 
 func reset() -> void:
 	manual_command = 0.0
+
+
+# Bumpless transfer: keep sending whatever the previous controller sent.
+func take_over(previous_command: float, _setpoint: float, _measurement: float) -> void:
+	manual_command = previous_command

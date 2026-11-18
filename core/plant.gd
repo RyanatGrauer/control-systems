@@ -87,6 +87,22 @@ func compute_derivative(_state: PackedFloat64Array, _applied_input: float,
 	return PackedFloat64Array()
 
 
+# Pure time delay between the actuator and the plant (seconds), e.g. heat
+# taking time to travel from a heater to a thermistor. Simulation delays the
+# applied input by this much before the ODE sees it. Default: none.
+# May depend on a live parameter; Simulation.MAX_INPUT_DEAD_TIME_S is the cap.
+func get_input_dead_time() -> float:
+	return 0.0
+
+
+# True when the controlled output is itself a speed (e.g. the flywheel's
+# RPM), false when it is a position/level (angle, height, temperature).
+# Feedforward uses this: for a speed output, the setpoint IS the velocity
+# that kV multiplies.
+func output_is_rate() -> bool:
+	return false
+
+
 # Which value the controller is trying to control.
 func get_output(_state: PackedFloat64Array) -> float:
 	return 0.0
@@ -104,6 +120,14 @@ func apply_constraints(state: PackedFloat64Array) -> PackedFloat64Array:
 # Scenario files (stage 15) will be able to override the defaults.
 func get_pid_gain_definitions() -> Array[QuantityInfo]:
 	return make_pid_gain_definitions(1.0, 100.0, 0.0, 100.0, 0.0, 10.0)
+
+
+# Feedforward gain sliders: kS, kV, kA, kG (stage 13). Defaults are 0, so
+# feedforward does nothing until the student adds it. Override to give
+# sensible maxima; use make_feedforward_definitions().
+func get_feedforward_definitions() -> Array[QuantityInfo]:
+	var input_max := get_input_definition().max_value
+	return make_feedforward_definitions(input_max * 0.2, 1.0, 1.0, input_max)
 
 
 # res:// path of the scene that draws this plant.
@@ -132,6 +156,32 @@ func make_pid_gain_definitions(kp_default: float, kp_max: float,
 		QuantityInfo.new("kd", "Kd (derivative)", "%s·s/%s" % [input_unit, output_unit]) \
 			.with_range(0.0, kd_max, kd_default).with_log_slider(kd_max * 1e-4) \
 			.with_description("Pushes against fast changes in the error, like a brake. Reduces overshoot; amplifies noise."),
+	]
+
+
+# kS, kV, kA, kG slider definitions with correct units. The "velocity" kV
+# multiplies is the setpoint's rate of change for position outputs, or the
+# setpoint itself for speed outputs (see output_is_rate()).
+func make_feedforward_definitions(ks_max: float, kv_max: float, ka_max: float,
+		kg_max: float) -> Array[QuantityInfo]:
+	var input_unit := get_input_definition().si_unit
+	var output_unit := get_output_definition().si_unit
+	var velocity_unit := output_unit if output_is_rate() else "%s/s" % output_unit
+	var acceleration_unit := "%s/s" % velocity_unit if output_is_rate() \
+			else "%s/s²" % output_unit
+	return [
+		QuantityInfo.new("ks", "kS (static)", input_unit) \
+			.with_range(0.0, ks_max, 0.0).with_log_slider(ks_max * 1e-3) \
+			.with_description("A constant push in the direction of motion, to break static friction."),
+		QuantityInfo.new("kv", "kV (velocity)", "%s/%s" % [input_unit, _wrap_unit(velocity_unit)]) \
+			.with_range(0.0, kv_max, 0.0).with_log_slider(kv_max * 1e-3) \
+			.with_description("Input needed per unit of target speed. Does most of the work before any error appears."),
+		QuantityInfo.new("ka", "kA (acceleration)", "%s/%s" % [input_unit, _wrap_unit(acceleration_unit)]) \
+			.with_range(0.0, ka_max, 0.0).with_log_slider(ka_max * 1e-3) \
+			.with_description("Extra input while the target is speeding up or slowing down (needs a motion profile)."),
+		QuantityInfo.new("kg", "kG (gravity / bias)", input_unit) \
+			.with_range(0.0, kg_max, 0.0).with_log_slider(kg_max * 1e-3) \
+			.with_description("A constant push that holds up a load against gravity."),
 	]
 
 

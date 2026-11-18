@@ -119,6 +119,17 @@ func get_pid_gain_definitions() -> Array[QuantityInfo]:
 	return make_pid_gain_definitions(0.05, 5.0, 0.0, 10.0, 0.0, 0.05)
 
 
+# The output (speed) is itself a velocity, so kV multiplies the speed setpoint.
+func output_is_rate() -> bool:
+	return true
+
+
+# TUNABLE: feedforward slider maxima. Ideal kV = 1/K ~ 0.0205 V/(rad/s),
+# ideal kA = J*R/Kt = 0.02 V/(rad/s²) with the default parameters.
+func get_feedforward_definitions() -> Array[QuantityInfo]:
+	return make_feedforward_definitions(2.0, 0.1, 0.1, 12.0)
+
+
 func get_visual_scene_path() -> String:
 	return "res://plants/flywheel/flywheel_visual.tscn"
 

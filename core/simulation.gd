@@ -23,10 +23,14 @@
 #   33 steps -> 30.3 Hz actual). get_actual_controller_rate_hz() reports it.
 #
 # ONE PHYSICS SUBSTEP (in this exact order, see step_physics()):
-#   1. If this step is a controller tick: read setpoint, measure, compute the
+#   0. Push the true output into the sensor's delay history; update the
+#      disturbance d(t) (DisturbanceGenerator).
+#   1. If this step is a controller tick: read setpoint (through the motion
+#      profile if on), measure, compute the
 #      command, pass it through the actuator. Hold the result.
 #   2. If this step is a record tick: record all signals at the CURRENT time.
-#   3. Integrate the plant ODE across dt with the held input.
+#   3. Integrate the plant ODE across dt with the held input (delayed by the
+#      plant's dead time, Plant.get_input_dead_time(), if any).
 #   4. Apply plant constraints (hard stops etc.) between substeps.
 #   5. Advance the step counter (time = step_count * dt, so no drift builds up).
 class_name Simulation
@@ -46,6 +50,7 @@ const DEFAULT_CONTROLLER_RATE_HZ: float = 100.0
 const DEFAULT_RECORD_RATE_HZ: float = 100.0
 const DEFAULT_RECORD_SECONDS: float = 120.0  # how much history the plots can show
 const DEFAULT_SEED: int = 12345
+const MAX_INPUT_DEAD_TIME_S: float = 10.0    # TUNABLE: longest plant dead time supported
 
 # --- the parts of the loop (replaceable) ---
 var plant: Plant
@@ -53,9 +58,13 @@ var controller: Controller
 var setpoint_generator: SetpointGenerator = SetpointGenerator.new()
 var sensor: Sensor = Sensor.new()
 var actuator: Actuator = Actuator.new()
+var disturbance_generator: DisturbanceGenerator = DisturbanceGenerator.new()
+var motion_profile: TrapezoidalProfile = TrapezoidalProfile.new()
+var use_motion_profile: bool = false  # smooth setpoint changes (stage 13)
 var recorder: RunRecorder
 
 # --- settings ---
+var bumpless_transfer: bool = true                             # see set_controller()
 var integrator_kind: Integrators.Kind = Integrators.Kind.RK4  # may change live
 var physics_rate_hz: float = DEFAULT_PHYSICS_RATE_HZ           # applied on reset()
 var random_seed: int = DEFAULT_SEED                            # applied on reset()
@@ -72,6 +81,7 @@ var disturbance: float = 0.0
 var controller_terms: Dictionary = {}  # latest P/I/D/FF contributions (may be empty)
 
 var _physics_dt: float = 1.0 / DEFAULT_PHYSICS_RATE_HZ
+var _input_delay: DelayLine = DelayLine.new(1)   # plant dead time (see step 3)
 var _requested_controller_rate_hz: float = DEFAULT_CONTROLLER_RATE_HZ
 var _controller_period_steps: int = 10
 var _record_period_steps: int = 10
@@ -93,6 +103,7 @@ func reset() -> void:
 	_record_period_steps = _compute_period_steps(DEFAULT_RECORD_RATE_HZ)
 
 	rng.seed = random_seed
+	disturbance_generator.reset(plant)  # first: undoes parameter drift before the initial state
 	state = plant.get_initial_state()
 	step_count = 0
 	command = 0.0
@@ -100,10 +111,13 @@ func reset() -> void:
 	disturbance = 0.0
 	controller_terms = {}
 	controller.reset()
-	sensor.reset()
+	sensor.configure(_physics_dt)
+	_input_delay = DelayLine.new(ceili(MAX_INPUT_DEAD_TIME_S / _physics_dt))
+	_input_delay.value_before_start = 0.0  # no input was applied before t = 0
 	actuator.reset()
 	recorder.clear()
 	setpoint = setpoint_generator.value_at(0.0)
+	motion_profile.reset(setpoint)
 	measurement = plant.get_output(state)
 
 
@@ -111,11 +125,16 @@ func reset() -> void:
 func step_physics() -> void:
 	var time := get_time()
 
+	# 0. Inputs that change every substep: sensor history (for its delay) and
+	#    the outside disturbance.
+	sensor.record_true_output(plant.get_output(state))
+	disturbance = disturbance_generator.update(time, _physics_dt, rng, plant)
+
 	# 1. Controller tick (zero-order hold between ticks).
 	if step_count % _controller_period_steps == 0:
 		var controller_dt := _controller_period_steps * _physics_dt
-		setpoint = setpoint_generator.value_at(time)
-		measurement = sensor.measure(plant.get_output(state), time, rng)
+		_update_setpoint(time)
+		measurement = sensor.measure(plant.get_output(state), time, rng, controller_dt)
 		command = controller.compute(setpoint, measurement, controller_dt)
 		controller_terms = controller.get_term_contributions()
 		applied_input = actuator.apply(command, controller_dt)
@@ -124,8 +143,14 @@ func step_physics() -> void:
 	if step_count % _record_period_steps == 0:
 		_record_sample(time)
 
-	# 3. Integrate the plant ODE across one substep with the held input.
-	state = Integrators.step(integrator_kind, plant, state, applied_input,
+	# 3. Integrate the plant ODE across one substep with the held input,
+	#    delayed by the plant's dead time if it has one.
+	_input_delay.push(applied_input)
+	var plant_input := applied_input
+	var dead_time := clampf(plant.get_input_dead_time(), 0.0, MAX_INPUT_DEAD_TIME_S)
+	if dead_time > 0.0:
+		plant_input = _input_delay.read(roundi(dead_time / _physics_dt))
+	state = Integrators.step(integrator_kind, plant, state, plant_input,
 			disturbance, time, _physics_dt)
 
 	# 4. Event logic that ODE solvers handle badly (hard stops, etc.).
@@ -133,6 +158,11 @@ func step_physics() -> void:
 
 	# 5. Time is derived from the step count so rounding never accumulates.
 	step_count += 1
+
+
+# A short "poke" disturbance starting now (click on the plant view).
+func poke(direction: float) -> void:
+	disturbance_generator.poke(get_time(), direction)
 
 
 # Run `count` substeps (used by tests and by the "Step" button).
@@ -160,10 +190,13 @@ func get_true_output() -> float:
 
 # Swap in a different controller (e.g. Manual <-> PID) without resetting the
 # run. The new controller starts with fresh memory.
-# (Bumpless transfer, which avoids an output jump on the switch, is stage 11.)
+# With bumpless_transfer on, the new controller picks up from the last command
+# instead of jumping (Controller.take_over()).
 func set_controller(new_controller: Controller) -> void:
 	controller = new_controller
 	controller.reset()
+	if bumpless_transfer:
+		controller.take_over(command, setpoint, measurement)
 	controller_terms = {}
 
 
@@ -180,6 +213,30 @@ func get_requested_controller_rate_hz() -> float:
 
 func get_actual_controller_rate_hz() -> float:
 	return 1.0 / (_controller_period_steps * _physics_dt)
+
+
+# Setpoint for this controller tick, through the motion profile if it is on,
+# plus the reference velocity/acceleration that feedforward uses.
+func _update_setpoint(time: float) -> void:
+	var raw_setpoint := setpoint_generator.value_at(time)
+	var rate := 0.0
+	var rate_of_rate := 0.0
+	if use_motion_profile:
+		if raw_setpoint != motion_profile.get_goal():
+			motion_profile.plan_to(raw_setpoint, time)
+		var sample := motion_profile.sample(time)
+		setpoint = sample[0]
+		rate = sample[1]
+		rate_of_rate = sample[2]
+	else:
+		motion_profile.reset(raw_setpoint)  # so turning it on starts from here
+		setpoint = raw_setpoint
+	if plant.output_is_rate():
+		controller.reference_velocity = setpoint
+		controller.reference_acceleration = rate
+	else:
+		controller.reference_velocity = rate
+		controller.reference_acceleration = rate_of_rate
 
 
 func _compute_period_steps(rate_hz: float) -> int:

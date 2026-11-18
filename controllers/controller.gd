@@ -11,6 +11,12 @@
 class_name Controller
 extends RefCounted
 
+# Set by Simulation before every compute(): how fast the (profiled) setpoint
+# is moving, in the units feedforward needs (see Plant.output_is_rate()).
+# Zero when there is no motion profile and the output is a position.
+var reference_velocity: float = 0.0
+var reference_acceleration: float = 0.0
+
 
 func get_display_name() -> String:
 	return "Controller"
@@ -25,6 +31,13 @@ func compute(_setpoint: float, _measurement: float, _dt: float) -> float:
 
 # Clear internal memory (integrators, previous error...) at the start of a run.
 func reset() -> void:
+	pass
+
+
+# Called when this controller takes over a running loop from another one
+# (e.g. Manual -> PID), right after reset(). Override to avoid a jump in the
+# command ("bumpless transfer"). previous_command is the last command sent.
+func take_over(_previous_command: float, _setpoint: float, _measurement: float) -> void:
 	pass
 
 

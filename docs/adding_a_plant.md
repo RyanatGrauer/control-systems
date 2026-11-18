@@ -4,12 +4,14 @@ Use `plants/flywheel/` as the worked example.
 
 1. **Create a folder** `plants/<name>/`.
 2. **Physics script** `<name>_plant.gd`: `class_name <Name>Plant`, `extends Plant`. Override:
-   * `get_display_name()`
+   * `get_display_name()`, and `get_description()`: one or two plain sentences shown above the plant view (what the controller drives, and what the goal is).
    * `get_parameter_definitions()`: one `QuantityInfo` per tunable parameter, in SI, with `.with_range(min, max, default)` and a one-sentence `.with_description(...)`. Use `.with_log_slider()` for values that span orders of magnitude. Each one automatically gets a slider in the "Plant parameters" panel.
    * `get_state_definitions()`: state components **in order**. Mark each one `.as_state(QuantityInfo.StateKind.POSITION)` or `RATE`. The semi-implicit Euler integrator updates RATE components first, then POSITION components.
    * `get_input_definition()`, `get_output_definition()`, `get_disturbance_definition()`. Use `.with_display("RPM", scale)` if students should see friendlier units.
    * `get_initial_state()`, `compute_derivative(state, applied_input, disturbance, time)` (return d(state)/dt), and `get_output(state)`.
-   * Optional: `apply_constraints(state)` for hard stops, stick/slip, and similar effects. This runs between substeps.
+   * Optional: `apply_constraints(state)` for hard stops, stick/slip, and similar effects. This runs between substeps. (For static friction, the elevator instead uses a Karnopp model inside `compute_derivative`.)
+   * Optional: `get_input_dead_time()` (seconds) for a pure delay between actuator and plant (see the hotend). `output_is_rate()` returns true if the output is a speed (this changes what kV multiplies).
+   * `get_feedforward_definitions()`: return `make_feedforward_definitions(ks_max, kv_max, ka_max, kg_max)`. Defaults are 0. Note the ideal values in a comment.
    * `get_pid_gain_definitions()`: return `make_pid_gain_definitions(kp_default, kp_max, ki_default, ki_max, kd_default, kd_max)`. Start P-only (Ki = Kd = 0). Units are generated automatically.
    * `get_visual_scene_path()`
    * Put the model equations in the header comment, with every symbol mapped to its variable name.

@@ -30,6 +30,7 @@ const ERROR: Color = Color("#E8E8E8")          # near-white
 const P_TERM: Color = Color("#FF7F6E")         # coral
 const I_TERM: Color = Color("#5FD3B3")         # mint
 const D_TERM: Color = Color("#B39DFF")         # lavender
+const FF_TERM: Color = Color("#7FB8FF")        # light blue (feedforward)
 const TERM_SUM: Color = Color("#FFFFFF")       # white, drawn dashed
 
 # Plot furniture.

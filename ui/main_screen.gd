@@ -46,6 +46,7 @@ var _setpoint_bar: SetpointBar
 var _settings_panel: SimSettingsPanel
 var _metrics_bar: MetricsBar
 var _charts: Array[StripChart] = []
+var _true_output_trace: ChartTrace
 
 
 func _ready() -> void:
@@ -67,6 +68,7 @@ func _process(delta: float) -> void:
 	else:
 		_pid_panel.update_panel()
 	_metrics_bar.update_bar(delta)
+	_true_output_trace.visible = not _simulation.sensor.is_ideal()
 	if steps > 0:
 		_redraw_charts()
 
@@ -244,6 +246,8 @@ func _build_layout() -> void:
 	horizontal_split.add_child(_build_side_panel())
 
 	# Always-visible setpoint controls right under the 3D scene.
+	_plant_view.poked.connect(_simulation.poke)
+
 	_setpoint_bar = SetpointBar.new()
 	_setpoint_bar.setup(_simulation)
 	_plant_view.set_bottom_bar(_setpoint_bar)
@@ -289,6 +293,20 @@ func _build_side_panel() -> Control:
 	_setpoint_panel = SetpointPanel.new()
 	setpoint_section.body.add_child(_setpoint_panel)
 	_setpoint_panel.setup(_simulation)
+
+	# --- Sensor & actuator non-idealities (README 7.5) ---
+	var nonideality_section := CollapsibleSection.new("Sensor & actuator", false)
+	column.add_child(nonideality_section)
+	var nonideality_panel := NonidealityPanel.new()
+	nonideality_section.body.add_child(nonideality_panel)
+	nonideality_panel.setup(_simulation)
+
+	# --- Disturbances (README 7.5, stage 14) ---
+	var disturbance_section := CollapsibleSection.new("Disturbances", false)
+	column.add_child(disturbance_section)
+	var disturbance_panel := DisturbancePanel.new()
+	disturbance_section.body.add_child(disturbance_panel)
+	disturbance_panel.setup(_simulation)
 
 	# --- Plant parameters ---
 	var parameter_section := CollapsibleSection.new("Plant parameters", false)
@@ -353,9 +371,14 @@ func _build_plot_area() -> Control:
 	var output_scale := output_info.display_scale
 	var input_scale := input_info.display_scale
 
+	_true_output_trace = ChartTrace.new("true_output", "True", SignalColors.TRUE_OUTPUT,
+			output_scale, false, 1.5)
 	var output_chart := _make_chart(output_info.display_name, output_info.get_shown_unit(), [
 		ChartTrace.new("setpoint", "Setpoint", SignalColors.SETPOINT, output_scale, true, 2.0),
 		ChartTrace.new("measurement", "Measured", SignalColors.MEASUREMENT, output_scale, false, 2.5),
+		# Drawn on top, thin, so it stays visible inside a noisy measurement.
+		# Shown only while the sensor is non-ideal (otherwise it hides "Measured").
+		_true_output_trace,
 	])
 	output_chart.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	output_chart.size_flags_stretch_ratio = 1.5
@@ -378,6 +401,7 @@ func _build_plot_area() -> Control:
 		ChartTrace.new("p_term", "P", SignalColors.P_TERM, input_scale, false, 2.0),
 		ChartTrace.new("i_term", "I", SignalColors.I_TERM, input_scale, false, 2.0),
 		ChartTrace.new("d_term", "D", SignalColors.D_TERM, input_scale, false, 2.0),
+		ChartTrace.new("ff_term", "FF", SignalColors.FF_TERM, input_scale, false, 2.0),
 		ChartTrace.new("controller_sum", "Sum", SignalColors.TERM_SUM, input_scale, true, 1.5),
 	])
 	terms_chart.name = "Terms"
@@ -390,6 +414,15 @@ func _build_plot_area() -> Control:
 	])
 	error_chart.name = "Error"
 	tabs.add_child(error_chart)
+
+	var disturbance_info := _simulation.plant.get_disturbance_definition()
+	var disturbance_chart := _make_chart(disturbance_info.display_name,
+			disturbance_info.get_shown_unit(), [
+		ChartTrace.new("disturbance", "Disturbance", SignalColors.DISTURBANCE,
+				disturbance_info.display_scale, false, 2.0),
+	])
+	disturbance_chart.name = "Disturbance"
+	tabs.add_child(disturbance_chart)
 
 	_metrics_bar = MetricsBar.new()
 	area.add_child(_metrics_bar)

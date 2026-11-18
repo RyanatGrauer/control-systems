@@ -106,6 +106,12 @@ func get_pid_gain_definitions() -> Array[QuantityInfo]:
 	return make_pid_gain_definitions(100.0, 2000.0, 0.0, 2000.0, 0.0, 200.0)
 
 
+# TUNABLE: feedforward slider maxima. Ideal kV = c (2 N·s/m), kA = m (1 kg).
+# (The spring's k·x is a position term, which plain kS/kV/kA/kG can't cancel.)
+func get_feedforward_definitions() -> Array[QuantityInfo]:
+	return make_feedforward_definitions(10.0, 20.0, 10.0, 50.0)
+
+
 func get_visual_scene_path() -> String:
 	return "res://plants/mass_spring_damper/mass_spring_damper_visual.tscn"
 

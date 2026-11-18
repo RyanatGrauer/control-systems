@@ -143,6 +143,9 @@ func _build() -> void:
 	row.add_child(_make_nudge_button("-", -1.0))
 
 	_slider = HSlider.new()
+	# The mouse wheel scrolls the panel, never the value: otherwise scrolling a
+	# long side panel silently changes whichever slider passes under the cursor.
+	_slider.scrollable = false
 	_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_slider.min_value = 0.0

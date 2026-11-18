@@ -14,6 +14,10 @@ extends VBoxContainer
 
 signal settings_changed  # so the setpoint bar can stay in sync
 
+# TUNABLE: default motion-profile limits, in output spans per second (²).
+const PROFILE_DEFAULT_SPANS_PER_S: float = 0.5
+const PROFILE_DEFAULT_SPANS_PER_S2: float = 1.0
+
 var _simulation: Simulation
 var _generator: SetpointGenerator
 var _pattern_menu: OptionButton
@@ -52,10 +56,58 @@ func setup(simulation: Simulation) -> void:
 		slider.value_changed_si.connect(_on_setting_changed.bind(info.key))
 		_sliders[info.key] = slider
 
+	_build_motion_profile_controls()
+
 	_readout = Label.new()
 	_readout.add_theme_font_size_override("font_size", 15)
 	add_child(_readout)
 	_update_visible_settings()
+
+
+# Trapezoidal motion profile (stage 13): a toggle plus speed/acceleration
+# limits scaled to the plant's output range.
+func _build_motion_profile_controls() -> void:
+	var output_info := _simulation.plant.get_output_definition()
+	var span := output_info.max_value - output_info.min_value
+	var profile := _simulation.motion_profile
+	profile.max_velocity = span * PROFILE_DEFAULT_SPANS_PER_S
+	profile.max_acceleration = span * PROFILE_DEFAULT_SPANS_PER_S2
+
+	var check_box := CheckBox.new()
+	check_box.text = "Smooth with a motion profile"
+	check_box.focus_mode = Control.FOCUS_NONE
+	check_box.button_pressed = _simulation.use_motion_profile
+	add_child(check_box)
+	var hint := Label.new()
+	hint.text = "Instead of jumping, the target speeds up, cruises and slows down (a trapezoid). Gives kV / kA feedforward something to work with."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(200.0, 0.0)
+	hint.add_theme_font_size_override("font_size", 13)
+	hint.add_theme_color_override("font_color", SignalColors.PLOT_AXIS_TEXT)
+	add_child(hint)
+
+	var sliders := VBoxContainer.new()
+	sliders.visible = check_box.button_pressed
+	add_child(sliders)
+	var shown_unit := output_info.get_shown_unit()
+	var velocity_info := QuantityInfo.new("max_velocity", "Max target speed", output_info.si_unit + "/s") \
+		.with_range(span * 0.02, span * 20.0, profile.max_velocity).with_log_slider() \
+		.with_description("Fastest the target may move (%s per second)." % shown_unit)
+	var acceleration_info := QuantityInfo.new("max_acceleration", "Max target acceleration",
+			output_info.si_unit + "/s²") \
+		.with_range(span * 0.02, span * 100.0, profile.max_acceleration).with_log_slider() \
+		.with_description("How quickly the target may speed up or slow down.")
+	if output_info.display_unit != "":
+		velocity_info.with_display(output_info.display_unit + "/s", output_info.display_scale)
+		acceleration_info.with_display(output_info.display_unit + "/s²", output_info.display_scale)
+	for info in [velocity_info, acceleration_info]:
+		var slider := LabeledSlider.new()
+		sliders.add_child(slider)
+		slider.setup(info, info.default_value)
+		slider.value_changed_si.connect(func(v: float) -> void: profile.set(info.key, v))
+	check_box.toggled.connect(func(on: bool) -> void:
+		_simulation.use_motion_profile = on
+		sliders.visible = on)
 
 
 # Called by main_screen.gd every frame.
