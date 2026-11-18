@@ -1,16 +1,22 @@
 # Control Lab architecture
 
-This file describes the code as it stands now (Milestone A). README.md is the spec; this is the map.
+This file describes the code as it stands now (Milestone B). README.md is the spec; this is the map.
 
 ## Folder layout
 
 ```
 core/            simulation clock, integrators, Simulation (one run), recorder, plant base class, storage paths
 plants/common/   PlantVisual3D base class, orbit camera, grid floor shader
+plants/common/   ...also MeshBuilders (coil spring, arrow)
 plants/flywheel/ plant #1: physics (flywheel_plant.gd) + 3D visual (flywheel_visual.tscn/.gd)
-controllers/     Controller base class, ManualController (PID arrives in stage 5)
-signal_blocks/   SetpointGenerator, Sensor, Actuator (ideal for now; non-idealities in Milestone C)
-ui/              main screen, toolbar, panels, sliders, strip chart, colour language
+plants/mass_spring_damper/  plant #3
+plants/servo/    plant #4 (DC motor position)
+plants/plant_catalog.gd     list of plants for the toolbar picker (replaced by scenarios in stage 15)
+controllers/     Controller base class, ManualController, PidController
+signal_blocks/   SetpointGenerator (constant/step/square/ramp/sine), Sensor, Actuator (ideal for now)
+core/step_metrics.gd        rise time, overshoot, settling, steady-state error, IAE, effort
+ui/              main screen, toolbar, panels (controller, PID, setpoint, parameters, settings),
+                 sliders, strip chart, term bars, metrics bar, colour language
 tests/           in-engine test runner, test scripts, test-only plants/controllers
 docs/            these notes
 ```
@@ -53,9 +59,23 @@ A plant extends `Plant` and describes itself with `QuantityInfo` metadata: param
 
 Every run owns `Simulation.rng`, seeded from the toolbar's **Seed** box on Reset. Anything random (noise, random disturbances) must draw from that RNG and nowhere else. Same seed + same settings = bit-identical run (tested).
 
+## Controllers
+
+`PidController` is parallel-form PID with optional output limits. The exact discrete update is written in its header comment: P = Kp·e, I += Ki·e·Δt, D = Kd·Δe/Δt on error, and D = 0 on the first tick. The integral stores the already-Ki-weighted sum, so changing Ki live never makes the output jump. There is deliberately **no anti-windup and no derivative-on-measurement yet**. Those are stage 11 toggles, so students can see the problems first.
+
+The Controller section switches Manual ⇄ PID without resetting the run (`Simulation.set_controller`). Each controller reports its term contributions (`get_term_contributions()`), and the Simulation records them as `p_term`, `i_term`, `d_term`, `ff_term` and `controller_sum` (the sum *before* output limits).
+
+Each plant supplies its own PID slider ranges and defaults through `get_pid_gain_definitions()`. Every plant starts **P-only**. Gain sliders are logarithmic with a "zero" stop at the far left.
+
+## Metrics
+
+`StepMetrics.analyze_recorder()` measures the **true output's** response to the most recent setpoint change. It is computed 4× per second, not every frame. The definitions are in the file header. Notable choices:
+* Rise time and settling are measured against the **setpoint**, not the final value. A P-only loop that stops short therefore shows "-", which is part of the lesson.
+* Steady-state error is shown only once the output has stopped moving.
+
 ## Plots
 
-`StripChart` reads a `RunRecorder` (a ring buffer, 120 s at 100 Hz). Features: multiple traces, legend, auto/locked Y axis, nice ticks (`ChartAxis`), hover readout, and scrubbing while paused (drag). It decimates by keeping the min and max per pixel column. Colours come from `SignalColors`. The setpoint is always dashed, so colour is never the only cue.
+The bottom area has the output chart on the left and tabs on the right: Command, P/I/D terms, and Error. The term plot uses separate lines rather than stacked areas (see the Milestone B review notes). The PID panel also shows live P/I/D/Sum bars. `StripChart` reads a `RunRecorder` (a ring buffer, 120 s at 100 Hz). Features: multiple traces, legend, auto/locked Y axis, nice ticks (`ChartAxis`), hover readout, and scrubbing while paused (drag). It decimates by keeping the min and max per pixel column. Colours come from `SignalColors`. The setpoint is always dashed, so colour is never the only cue.
 
 ## Storage (README §7.10–7.11)
 
@@ -67,7 +87,7 @@ Every run owns `Simulation.rng`, seeded from the toolbar's **Seed** box on Reset
 |---|---|
 | App | Open the project in Godot 4.7 and press Play (main scene `ui/main_screen.tscn`). |
 | Tests (editor) | Open `tests/test_runner.tscn` and use Run Current Scene (F6). Results appear in Output. |
-| Tests (command line) | `godot --headless --path . res://tests/test_runner.tscn` (exit code 0 = all passed) |
+| Tests (command line) | `godot --headless --path . res://tests/test_runner.tscn` (exit code 0 = all passed). Any engine/script error during a test fails it (the runner listens through `OS.add_logger`). `test_ui_smoke.gd` builds the real UI and drives every plant and mode. |
 | Web build | `godot --headless --path . --export-release "Web" build/web/index.html`, then serve `build/web/` with any static server (e.g. `python3 -m http.server`). No special headers needed (threads off). |
 
 ## Keyboard (InputMap actions, remappable in Project Settings › Input Map)
@@ -77,6 +97,8 @@ Every run owns `Simulation.rng`, seeded from the toolbar's **Seed** box on Reset
 | `sim_toggle_pause` | Space |
 | `sim_reset` | R |
 | `sim_step` | . (period) |
-| `manual_command_up` / `manual_command_down` | Up / Down arrows (hold) |
+| `manual_command_up` / `manual_command_down` | Up / Down arrows (hold), Manual mode |
+| `gain_select_p` / `gain_select_i` / `gain_select_d` | P / I / D, PID mode |
+| `gain_nudge_up` / `gain_nudge_down` | ] / [ (×1.1 / ÷1.1 on the selected gain; from 0, ] jumps to 1% of the gain's max) |
 
 Sliders and buttons do not take keyboard focus, so these keys always reach the app. The exception is while typing in a number field.

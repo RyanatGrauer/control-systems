@@ -13,8 +13,8 @@ func _make_loop(random_seed: int) -> Simulation:
 	controller.rng = simulation.rng
 	controller.noise_volts = 0.5
 	controller.gain = 0.2
-	simulation.setpoint_generator.step_time = 0.5
-	simulation.setpoint_generator.final_value = 300.0
+	simulation.setpoint_generator.start_time = 0.5
+	simulation.setpoint_generator.target_level = 300.0
 	simulation.random_seed = random_seed
 	simulation.reset()
 	return simulation

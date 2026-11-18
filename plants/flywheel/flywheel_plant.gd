@@ -37,6 +37,10 @@ func get_display_name() -> String:
 	return "Flywheel / DC motor speed"
 
 
+func get_description() -> String:
+	return "Your controller sets the motor voltage (yellow) that spins the wheel. Goal: keep the wheel at the target speed (orange)."
+
+
 func get_parameter_definitions() -> Array[QuantityInfo]:
 	# TUNABLE: default plant parameters and slider ranges.
 	return [
@@ -105,6 +109,14 @@ func compute_derivative(state: PackedFloat64Array, applied_input: float,
 
 func get_output(state: PackedFloat64Array) -> float:
 	return state[0]
+
+
+# TUNABLE: default PID gains and slider maxima for this plant.
+# Every plant starts P-only so students add I and D themselves.
+# Kp = 0.05 alone leaves ~30% steady-state error (the classic "P is not enough"
+# lesson); Ki around 0.1 removes it.
+func get_pid_gain_definitions() -> Array[QuantityInfo]:
+	return make_pid_gain_definitions(0.05, 5.0, 0.0, 10.0, 0.0, 0.05)
 
 
 func get_visual_scene_path() -> String:

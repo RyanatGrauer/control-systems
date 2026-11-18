@@ -41,6 +41,10 @@ var display_unit: String = ""   # empty means "same as si_unit"
 var display_scale: float = 1.0  # shown_value = si_value * display_scale
 
 var use_log_slider: bool = false  # true for values that span orders of magnitude
+# For log sliders whose min_value is 0 (e.g. PID gains, which must be able to
+# be exactly zero): the far-left slider position means 0, and the rest of the
+# slider is logarithmic from `log_floor` up to max_value.
+var log_floor: float = 0.0
 var state_kind: StateKind = StateKind.NOT_A_STATE
 
 
@@ -68,8 +72,9 @@ func with_display(unit: String, scale_from_si: float) -> QuantityInfo:
 	return self
 
 
-func with_log_slider() -> QuantityInfo:
+func with_log_slider(smallest_nonzero: float = 0.0) -> QuantityInfo:
 	use_log_slider = true
+	log_floor = smallest_nonzero
 	return self
 
 

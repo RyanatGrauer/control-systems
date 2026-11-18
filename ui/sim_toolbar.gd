@@ -1,7 +1,7 @@
 # sim_toolbar.gd
 #
 # PURPOSE
-#   The top bar (README 7.1): scenario name, Play/Pause, Step, Reset, the
+#   The top bar (README 7.1): plant picker, Play/Pause, Step, Reset, the
 #   time-scale slider, the random seed, a simulated-time readout, a "running
 #   slower than real time" warning, and a fullscreen toggle.
 #
@@ -9,7 +9,8 @@
 #   It only emits signals; main_screen.gd decides what they do. That keeps the
 #   toolbar free of simulation logic. main_screen.gd calls the update_*()
 #   functions every frame so the bar shows the current state.
-#   (Scenario picker and Presenter toggle arrive in stages 15 and 18.)
+#   The plant picker is temporary: stage 15 turns it into the scenario picker.
+#   (The Presenter toggle arrives in stage 18.)
 class_name SimToolbar
 extends PanelContainer
 
@@ -18,6 +19,7 @@ signal step_pressed
 signal reset_pressed
 signal time_scale_changed(new_scale: float)
 signal seed_changed(new_seed: int)
+signal plant_selected(index: int)
 
 # TUNABLE: how long the "slower than real time" warning stays visible after
 # the last slow frame, so it does not flicker.
@@ -32,15 +34,19 @@ var _slow_label: Label
 var _slow_warning_timer: float = 0.0
 
 
-func _init(scenario_name: String) -> void:
+func _init(plant_names: PackedStringArray, selected_plant: int) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	add_child(row)
 
-	var title := Label.new()
-	title.text = scenario_name
-	title.add_theme_font_size_override("font_size", 16)
-	row.add_child(title)
+	var plant_menu := OptionButton.new()
+	plant_menu.focus_mode = Control.FOCUS_NONE
+	plant_menu.tooltip_text = "Choose the system to control"
+	for plant_name in plant_names:
+		plant_menu.add_item(plant_name)
+	plant_menu.select(selected_plant)
+	plant_menu.item_selected.connect(plant_selected.emit)
+	row.add_child(plant_menu)
 	row.add_child(VSeparator.new())
 
 	_play_button = _make_button("Play", "Start or pause the simulation (Space)")
@@ -140,6 +146,15 @@ func update_slow_warning(is_running_slow: bool, frame_delta: float) -> void:
 
 func get_seed() -> int:
 	return int(_seed_box.value)
+
+
+func set_seed(new_seed: int) -> void:
+	_seed_box.set_value_no_signal(new_seed)
+
+
+# Moves the slider; its value_changed signal then updates the clock.
+func set_time_scale(new_scale: float) -> void:
+	_time_scale_slider.value = log(new_scale) / log(4.0)
 
 
 func _make_button(text: String, tooltip: String) -> Button:

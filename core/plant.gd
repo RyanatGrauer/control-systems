@@ -41,6 +41,12 @@ func get_display_name() -> String:
 	return "Unnamed plant"
 
 
+# One or two plain sentences shown over the plant view: what the controller
+# is physically doing and what the goal is.
+func get_description() -> String:
+	return ""
+
+
 # Tunable physical parameters (drive the "Plant parameters" panel).
 func get_parameter_definitions() -> Array[QuantityInfo]:
 	return []
@@ -93,12 +99,48 @@ func apply_constraints(state: PackedFloat64Array) -> PackedFloat64Array:
 	return state
 
 
+# PID gain sliders for this plant: Kp, Ki, Kd as QuantityInfo (defaults and
+# ranges differ hugely between plants). Use make_pid_gain_definitions().
+# Scenario files (stage 15) will be able to override the defaults.
+func get_pid_gain_definitions() -> Array[QuantityInfo]:
+	return make_pid_gain_definitions(1.0, 100.0, 0.0, 100.0, 0.0, 10.0)
+
+
 # res:// path of the scene that draws this plant.
 func get_visual_scene_path() -> String:
 	return ""
 
 
 # ---------------------------------------------------------------- helpers
+
+# Builds Kp/Ki/Kd slider definitions with correct units, e.g. for a plant whose
+# input is V and output is rad/s: Kp in V/(rad/s), Ki in V/((rad/s)·s),
+# Kd in V·s/(rad/s). Each gain can be 0 (far left of its log slider);
+# otherwise its slider spans 4 decades below its maximum.
+func make_pid_gain_definitions(kp_default: float, kp_max: float,
+		ki_default: float, ki_max: float,
+		kd_default: float, kd_max: float) -> Array[QuantityInfo]:
+	var input_unit := get_input_definition().si_unit
+	var output_unit := _wrap_unit(get_output_definition().si_unit)
+	return [
+		QuantityInfo.new("kp", "Kp (proportional)", "%s/%s" % [input_unit, output_unit]) \
+			.with_range(0.0, kp_max, kp_default).with_log_slider(kp_max * 1e-4) \
+			.with_description("Pushes in proportion to the error right now. More Kp = faster, but more overshoot."),
+		QuantityInfo.new("ki", "Ki (integral)", "%s/(%s·s)" % [input_unit, output_unit]) \
+			.with_range(0.0, ki_max, ki_default).with_log_slider(ki_max * 1e-4) \
+			.with_description("Pushes harder the longer an error lasts. Removes steady-state error, but can overshoot."),
+		QuantityInfo.new("kd", "Kd (derivative)", "%s·s/%s" % [input_unit, output_unit]) \
+			.with_range(0.0, kd_max, kd_default).with_log_slider(kd_max * 1e-4) \
+			.with_description("Pushes against fast changes in the error, like a brake. Reduces overshoot; amplifies noise."),
+	]
+
+
+# "rad/s" -> "(rad/s)" so compound units stay unambiguous.
+static func _wrap_unit(unit: String) -> String:
+	if "/" in unit:
+		return "(%s)" % unit
+	return unit
+
 
 func get_state_kinds() -> Array[QuantityInfo.StateKind]:
 	return _state_kinds

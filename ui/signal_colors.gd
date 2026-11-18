@@ -23,6 +23,14 @@ const TRUE_OUTPUT: Color = Color("#009E73")    # bluish green, thin
 const COMMAND: Color = Color("#CC79A7")        # reddish purple, dashed
 const APPLIED_INPUT: Color = Color("#F0E442")  # yellow, solid
 const DISTURBANCE: Color = Color("#D55E00")    # vermillion
+const ERROR: Color = Color("#E8E8E8")          # near-white
+
+# PID term contributions. These only appear together in the term plot and the
+# term bars, so they reuse no signal colours; each also has its own label.
+const P_TERM: Color = Color("#FF7F6E")         # coral
+const I_TERM: Color = Color("#5FD3B3")         # mint
+const D_TERM: Color = Color("#B39DFF")         # lavender
+const TERM_SUM: Color = Color("#FFFFFF")       # white, drawn dashed
 
 # Plot furniture.
 const PLOT_BACKGROUND: Color = Color(0.09, 0.10, 0.12)

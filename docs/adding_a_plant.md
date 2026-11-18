@@ -10,8 +10,10 @@ Use `plants/flywheel/` as the worked example.
    * `get_input_definition()`, `get_output_definition()`, `get_disturbance_definition()`. Use `.with_display("RPM", scale)` if students should see friendlier units.
    * `get_initial_state()`, `compute_derivative(state, applied_input, disturbance, time)` (return d(state)/dt), and `get_output(state)`.
    * Optional: `apply_constraints(state)` for hard stops, stick/slip, and similar effects. This runs between substeps.
+   * `get_pid_gain_definitions()`: return `make_pid_gain_definitions(kp_default, kp_max, ki_default, ki_max, kd_default, kd_max)`. Start P-only (Ki = Kd = 0). Units are generated automatically.
    * `get_visual_scene_path()`
    * Put the model equations in the header comment, with every symbol mapped to its variable name.
 3. **Visual** `<name>_visual.tscn` with a root `Node3D` whose script extends `PlantVisual3D`. In `_ready()` call `build_studio(look_at, distance, yaw, pitch)`, then build meshes. Use `PlantVisual3D.add_mesh()` for simple lit parts. Override `show_state()`, and `reset_visual()` if you keep animation history. Animate using `sim_time`, not frame time.
 4. **Tests** `tests/test_<name>.gd` extending `TestCase`: check equilibrium, a known analytic case, and energy behaviour if the plant is undamped.
-5. Until the scenario picker exists (stage 15), try the plant by changing the `FlywheelPlant.new()` line in `ui/main_screen.gd::_ready()`.
+5. Add the script to `PLANT_SCRIPTS` in `plants/plant_catalog.gd` (in teaching order). It then appears in the toolbar picker, and `test_every_catalog_plant_is_consistent` plus the UI smoke test cover it automatically. (Stage 15 replaces the catalog with scenario files.)
+6. Visual conventions: the measured thing uses `SignalColors.MEASUREMENT`, the setpoint ghost uses `make_ghost_material()`, and the applied input (arrow, etc.) uses `SignalColors.APPLIED_INPUT`.

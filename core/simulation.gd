@@ -33,9 +33,11 @@ class_name Simulation
 extends RefCounted
 
 # Channel names stored by the recorder. The CSV export (stage 19) will use these.
+# Controller term channels (p/i/d/ff/sum) are zero for controllers without terms.
 const RECORDED_CHANNELS: PackedStringArray = [
-	"time", "setpoint", "measurement", "true_output",
+	"time", "setpoint", "measurement", "true_output", "error",
 	"command", "applied_input", "disturbance",
+	"p_term", "i_term", "d_term", "ff_term", "controller_sum",
 ]
 
 # TUNABLE: defaults for a new run.
@@ -67,6 +69,7 @@ var measurement: float = 0.0
 var command: float = 0.0
 var applied_input: float = 0.0
 var disturbance: float = 0.0
+var controller_terms: Dictionary = {}  # latest P/I/D/FF contributions (may be empty)
 
 var _physics_dt: float = 1.0 / DEFAULT_PHYSICS_RATE_HZ
 var _requested_controller_rate_hz: float = DEFAULT_CONTROLLER_RATE_HZ
@@ -95,6 +98,7 @@ func reset() -> void:
 	command = 0.0
 	applied_input = 0.0
 	disturbance = 0.0
+	controller_terms = {}
 	controller.reset()
 	sensor.reset()
 	actuator.reset()
@@ -113,6 +117,7 @@ func step_physics() -> void:
 		setpoint = setpoint_generator.value_at(time)
 		measurement = sensor.measure(plant.get_output(state), time, rng)
 		command = controller.compute(setpoint, measurement, controller_dt)
+		controller_terms = controller.get_term_contributions()
 		applied_input = actuator.apply(command, controller_dt)
 
 	# 2. Record the signals as they are at the START of this substep.
@@ -153,6 +158,15 @@ func get_true_output() -> float:
 	return plant.get_output(state)
 
 
+# Swap in a different controller (e.g. Manual <-> PID) without resetting the
+# run. The new controller starts with fresh memory.
+# (Bumpless transfer, which avoids an output jump on the switch, is stage 11.)
+func set_controller(new_controller: Controller) -> void:
+	controller = new_controller
+	controller.reset()
+	controller_terms = {}
+
+
 # Controller rate may change LIVE: students lower it during a run and watch a
 # well-tuned loop go unstable (README 4.1 "teaching payoff").
 func set_controller_rate_hz(rate_hz: float) -> void:
@@ -179,7 +193,13 @@ func _record_sample(time: float) -> void:
 		"setpoint": setpoint,
 		"measurement": measurement,
 		"true_output": plant.get_output(state),
+		"error": setpoint - measurement,
 		"command": command,
 		"applied_input": applied_input,
 		"disturbance": disturbance,
+		"p_term": controller_terms.get("p", 0.0),
+		"i_term": controller_terms.get("i", 0.0),
+		"d_term": controller_terms.get("d", 0.0),
+		"ff_term": controller_terms.get("ff", 0.0),
+		"controller_sum": controller_terms.get("sum", command),
 	})

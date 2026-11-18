@@ -36,7 +36,7 @@ var _last_sim_time: float = 0.0
 
 
 func _ready() -> void:
-	build_studio(Vector3(-0.1, 0.65, 0.0), 2.9, 60.0, 16.0)
+	build_studio(Vector3(-0.1, 0.8, 0.0), 2.5, 60.0, 14.0)
 	_build_stand_and_motor()
 	_build_wheel()
 	_build_labels()
@@ -161,19 +161,5 @@ func _build_wheel() -> void:
 
 
 func _build_labels() -> void:
-	_speed_label = _make_label(Vector3(WHEEL_CENTER.x, 1.48, 0.0), 80, SignalColors.MEASUREMENT)
-	_target_label = _make_label(Vector3(WHEEL_CENTER.x, 1.34, 0.0), 48, SignalColors.SETPOINT)
-
-
-func _make_label(at: Vector3, font_size: int, color: Color) -> Label3D:
-	var label := Label3D.new()
-	label.position = at
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.font_size = font_size
-	label.pixel_size = 0.0025
-	label.outline_size = 16
-	label.modulate = color
-	label.outline_modulate = Color(0.0, 0.0, 0.0, 0.85)
-	label.no_depth_test = true
-	add_child(label)
-	return label
+	_speed_label = add_label(Vector3(WHEEL_CENTER.x, 1.48, 0.0), 80, SignalColors.MEASUREMENT)
+	_target_label = add_label(Vector3(WHEEL_CENTER.x, 1.34, 0.0), 48, SignalColors.SETPOINT)

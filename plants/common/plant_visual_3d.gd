@@ -99,3 +99,28 @@ static func add_mesh(parent: Node3D, mesh: Mesh, color: Color,
 	instance.material_override = material
 	parent.add_child(instance)
 	return instance
+
+
+# Translucent material in the setpoint colour for a "ghost" copy of the plant
+# drawn at the target position (README 4.4). Unshaded so it reads as an overlay.
+static func make_ghost_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(SignalColors.SETPOINT, 0.35)
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	return material
+
+
+# Billboard text label (always faces the camera, drawn on top of geometry).
+func add_label(at: Vector3, font_size: int, color: Color) -> Label3D:
+	var label := Label3D.new()
+	label.position = at
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.font_size = font_size
+	label.pixel_size = 0.0025
+	label.outline_size = 16
+	label.modulate = color
+	label.outline_modulate = Color(0.0, 0.0, 0.0, 0.85)
+	label.no_depth_test = true
+	add_child(label)
+	return label
