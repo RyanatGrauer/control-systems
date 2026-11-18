@@ -17,7 +17,8 @@
 #     can drag left/right to scrub back through history
 #   - drawing is DECIMATED: for each pixel column we keep only the min and max
 #     sample, so long runs stay smooth on school laptops
-#   Ghost traces and challenge spec bands are added in later stages.
+#   - ghost runs (GhostRun): earlier runs drawn faded behind the live traces,
+#     for every trace marked `ghost = true`. Challenge spec bands come later.
 class_name StripChart
 extends Control
 
@@ -36,6 +37,8 @@ const AUTO_SCALE_PADDING: float = 0.08  # fraction of the data span added above/
 
 var recorder: RunRecorder
 var traces: Array[ChartTrace] = []
+var ghosts: Array[GhostRun] = []  # shared with the owner; drawn oldest first
+var show_ghosts: bool = true
 var chart_title: String = ""
 var y_unit: String = ""
 var time_window_s: float = 10.0
@@ -97,7 +100,7 @@ func set_y_axis_locked(locked: bool) -> void:
 
 func _draw() -> void:
 	var plot_rect := _get_plot_rect()
-	draw_rect(Rect2(Vector2.ZERO, size), SignalColors.PLOT_BACKGROUND)
+	draw_rect(Rect2(Vector2.ZERO, size), DisplaySettings.plot_background())
 	if plot_rect.size.x < 10.0 or plot_rect.size.y < 10.0:
 		return
 
@@ -105,9 +108,16 @@ func _draw() -> void:
 	var y_range := _get_y_range(time_range.x, time_range.y)
 
 	_draw_grid(plot_rect, time_range, y_range)
+	if show_ghosts:
+		for ghost in ghosts:
+			for trace in traces:
+				if trace.visible and trace.ghost:
+					_draw_series(ghost.recorder, trace.channel, trace.display_scale,
+							ghost.color, trace.width * DisplaySettings.line_scale(), false, plot_rect, time_range, y_range)
 	for trace in traces:
 		if trace.visible:
-			_draw_trace(trace, plot_rect, time_range, y_range)
+			_draw_series(recorder, trace.channel, trace.display_scale, trace.color,
+					trace.width * DisplaySettings.line_scale(), trace.dashed, plot_rect, time_range, y_range)
 	_draw_title_and_legend()
 	_draw_hover_readout(plot_rect, time_range, y_range)
 	if frozen:
@@ -156,6 +166,19 @@ func _get_y_range(start_time: float, end_time: float) -> Vector2:
 				var value := recorder.get_value(trace.channel, i) * trace.display_scale
 				data_min = minf(data_min, value)
 				data_max = maxf(data_max, value)
+	# Ghosts count too, so a compared run is never cut off the top.
+	if show_ghosts:
+		for ghost in ghosts:
+			var ghost_first := ghost.recorder.find_first_index_at_or_after(start_time)
+			var ghost_last := mini(ghost.recorder.find_first_index_at_or_after(end_time),
+					ghost.recorder.get_count() - 1)
+			for trace in traces:
+				if not (trace.visible and trace.ghost):
+					continue
+				for i in range(ghost_first, ghost_last + 1):
+					var value := ghost.recorder.get_value(trace.channel, i) * trace.display_scale
+					data_min = minf(data_min, value)
+					data_max = maxf(data_max, value)
 
 	if data_min == INF:  # no data at all
 		return Vector2(0.0, 1.0)
@@ -197,7 +220,7 @@ func _draw_grid(plot_rect: Rect2, time_range: Vector2, y_range: Vector2) -> void
 	for tick in ChartAxis.tick_values(y_range.x, y_range.y, y_step):
 		var y := _value_to_y(tick, plot_rect, y_range)
 		draw_line(Vector2(plot_rect.position.x, y), Vector2(plot_rect.end.x, y),
-				SignalColors.PLOT_GRID, 1.0)
+				DisplaySettings.plot_grid(), 1.0)
 		_draw_text(Vector2(plot_rect.position.x - 6.0, y + 4.0),
 				NumberFormat.for_step(tick, y_step), TICK_FONT_SIZE,
 				SignalColors.PLOT_AXIS_TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
@@ -206,22 +229,24 @@ func _draw_grid(plot_rect: Rect2, time_range: Vector2, y_range: Vector2) -> void
 	for tick in ChartAxis.tick_values(time_range.x, time_range.y, x_step):
 		var x := _time_to_x(tick, plot_rect, time_range)
 		draw_line(Vector2(x, plot_rect.position.y), Vector2(x, plot_rect.end.y),
-				SignalColors.PLOT_GRID, 1.0)
+				DisplaySettings.plot_grid(), 1.0)
 		_draw_text(Vector2(x, plot_rect.end.y + 16.0),
 				NumberFormat.for_step(tick, x_step) + " s", TICK_FONT_SIZE,
 				SignalColors.PLOT_AXIS_TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 
-	draw_rect(plot_rect, SignalColors.PLOT_GRID, false, 1.0)
+	draw_rect(plot_rect, DisplaySettings.plot_grid(), false, 1.0)
 
 
-func _draw_trace(trace: ChartTrace, plot_rect: Rect2, time_range: Vector2,
-		y_range: Vector2) -> void:
-	if recorder == null or recorder.get_count() == 0:
+# Draws one channel of `source` (the live recorder or a ghost's copy).
+func _draw_series(source: RunRecorder, channel: String, display_scale: float,
+		color: Color, width: float, dashed: bool, plot_rect: Rect2,
+		time_range: Vector2, y_range: Vector2) -> void:
+	if source == null or source.get_count() == 0:
 		return
 	# Include one sample on each side of the window so the line reaches the edges.
-	var first := maxi(recorder.find_first_index_at_or_after(time_range.x) - 1, 0)
-	var last := mini(recorder.find_first_index_at_or_after(time_range.y),
-			recorder.get_count() - 1)
+	var first := maxi(source.find_first_index_at_or_after(time_range.x) - 1, 0)
+	var last := mini(source.find_first_index_at_or_after(time_range.y),
+			source.get_count() - 1)
 	if last <= first:
 		return
 
@@ -235,8 +260,8 @@ func _draw_trace(trace: ChartTrace, plot_rect: Rect2, time_range: Vector2,
 	var column_max := 0.0
 	var min_came_first := true
 	for i in range(first, last + 1):
-		var x := _time_to_x(recorder.get_value("time", i), plot_rect, time_range)
-		var value := recorder.get_value(trace.channel, i) * trace.display_scale
+		var x := _time_to_x(source.get_value("time", i), plot_rect, time_range)
+		var value := source.get_value(channel, i) * display_scale
 		var this_column := floori(x)
 		if this_column != column:
 			if column >= 0:
@@ -259,10 +284,10 @@ func _draw_trace(trace: ChartTrace, plot_rect: Rect2, time_range: Vector2,
 
 	if points.size() < 2:
 		return
-	if trace.dashed:
-		_draw_dashed_polyline(points, trace.color, trace.width)
+	if dashed:
+		_draw_dashed_polyline(points, color, width)
 	else:
-		draw_polyline(points, trace.color, trace.width, true)
+		draw_polyline(points, color, width, true)
 
 
 func _append_column(points: PackedVector2Array, x: float, column_min: float,
@@ -333,6 +358,14 @@ func _draw_title_and_legend() -> void:
 		_draw_text(Vector2(x + 27.0, 19.0), trace.label, TICK_FONT_SIZE,
 				SignalColors.PLOT_AXIS_TEXT, HORIZONTAL_ALIGNMENT_LEFT)
 		x += 40.0 + font.get_string_size(trace.label, HORIZONTAL_ALIGNMENT_LEFT, -1,
+				TICK_FONT_SIZE).x
+	if not show_ghosts or not traces.any(func(t: ChartTrace) -> bool: return t.ghost):
+		return
+	for ghost in ghosts:
+		draw_line(Vector2(x, 14.0), Vector2(x + 22.0, 14.0), ghost.color, 2.5)
+		_draw_text(Vector2(x + 27.0, 19.0), ghost.label, TICK_FONT_SIZE,
+				ghost.color, HORIZONTAL_ALIGNMENT_LEFT)
+		x += 40.0 + font.get_string_size(ghost.label, HORIZONTAL_ALIGNMENT_LEFT, -1,
 				TICK_FONT_SIZE).x
 
 

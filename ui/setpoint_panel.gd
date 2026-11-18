@@ -47,12 +47,10 @@ func setup(simulation: Simulation) -> void:
 	_pattern_menu.item_selected.connect(_on_pattern_selected)
 	add_child(_pattern_menu)
 
-	# Start every setting at its default (they depend on the plant's units).
-	for info in _make_setting_definitions():
-		_generator.set(info.key, info.default_value)
+	for info in make_setting_definitions(simulation.plant.get_output_definition()):
 		var slider := LabeledSlider.new()
 		add_child(slider)
-		slider.setup(info, info.default_value)
+		slider.setup(info, _generator.get(info.key))
 		slider.value_changed_si.connect(_on_setting_changed.bind(info.key))
 		_sliders[info.key] = slider
 
@@ -70,8 +68,6 @@ func _build_motion_profile_controls() -> void:
 	var output_info := _simulation.plant.get_output_definition()
 	var span := output_info.max_value - output_info.min_value
 	var profile := _simulation.motion_profile
-	profile.max_velocity = span * PROFILE_DEFAULT_SPANS_PER_S
-	profile.max_acceleration = span * PROFILE_DEFAULT_SPANS_PER_S2
 
 	var check_box := CheckBox.new()
 	check_box.text = "Smooth with a motion profile"
@@ -140,9 +136,19 @@ func sync_from_generator() -> void:
 	_update_visible_settings()
 
 
+# Plant-scaled defaults for every setpoint setting and the motion profile.
+# Called when a scenario loads, before its overrides; setup() only reads them.
+static func apply_defaults(simulation: Simulation) -> void:
+	var output_info := simulation.plant.get_output_definition()
+	for info in make_setting_definitions(output_info):
+		simulation.setpoint_generator.set(info.key, info.default_value)
+	var span := output_info.max_value - output_info.min_value
+	simulation.motion_profile.max_velocity = span * PROFILE_DEFAULT_SPANS_PER_S
+	simulation.motion_profile.max_acceleration = span * PROFILE_DEFAULT_SPANS_PER_S2
+
+
 # Slider definitions. The keys match SetpointGenerator's variable names.
-func _make_setting_definitions() -> Array[QuantityInfo]:
-	var output_info := _simulation.plant.get_output_definition()
+static func make_setting_definitions(output_info: QuantityInfo) -> Array[QuantityInfo]:
 	var low := output_info.min_value
 	var high := output_info.max_value
 	var span := high - low

@@ -163,6 +163,33 @@ func get_feedforward_definitions() -> Array[QuantityInfo]:
 	return make_feedforward_definitions(3.0, 30.0, 2.0, 12.0)
 
 
+func get_equation_text(state: PackedFloat64Array, plant_input: float,
+		disturbance: float) -> String:
+	var x := state[0]
+	var v := state[1]
+	var m := get_parameter("mass")
+	var k := get_parameter("motor_constant")
+	var r := get_parameter("resistance")
+	var motor_force := k * (plant_input - k * v) / r
+	var acceleration := compute_derivative(state, plant_input, disturbance, 0.0)[1]
+	# Friction is whatever is left over (it depends on sticking/sliding).
+	var friction := motor_force - m * GRAVITY - get_parameter("viscous_friction") * v \
+			- disturbance - m * acceleration
+	var stops := ""
+	if x <= 0.0:
+		stops = "  (resting on the bottom stop)"
+	elif x >= RAIL_HEIGHT:
+		stops = "  (against the top stop)"
+	return "\n".join([
+		"F_motor = k·(V - k·v)/R = %s·(%s - %s·%s)/%s = %s N" % [num(k), num(plant_input), num(k),
+			num(v), num(r), num(motor_force)],
+		"m·dv/dt = F_motor - m·g - b·v - F_friction - F_load",
+		"%s·dv/dt = %s - %s - %s - %s - %s" % [num(m), num(motor_force), num(m * GRAVITY),
+			num(get_parameter("viscous_friction") * v), num(friction), num(disturbance)],
+		"dv/dt = %s m/s²   (x = %s m, v = %s m/s)%s" % [num(acceleration), num(x), num(v), stops],
+	])
+
+
 func get_visual_scene_path() -> String:
 	return "res://plants/elevator/elevator_visual.tscn"
 

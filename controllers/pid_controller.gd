@@ -213,3 +213,64 @@ func reset_integral() -> void:
 
 func get_term_contributions() -> Dictionary:
 	return _last_terms
+
+
+# --- tuning snapshots (stage 16) ---
+
+# Every setting (gains, switches, feedforward...) as name -> value. Built from
+# the script's own variable list, so new settings are included automatically.
+# Leaves out memory (names starting with "_") and the per-tick references.
+func get_tuning() -> Dictionary:
+	var tuning := {}
+	for property in get_script().get_script_property_list():
+		var property_name: String = property["name"]
+		if property["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
+			continue
+		if property_name.begins_with("_") or property_name.begins_with("reference_"):
+			continue
+		tuning[property_name] = get(property_name)
+	return tuning
+
+
+func apply_tuning(tuning: Dictionary) -> void:
+	for property_name: String in tuning:
+		set(property_name, tuning[property_name])
+
+
+# --- Equations tab (stage 17) ---
+
+func get_equation_text(setpoint: float, measurement: float) -> String:
+	var n := func(value: float) -> String: return NumberFormat.significant(value, 3)
+	var e := setpoint - measurement
+	var t: Dictionary = _last_terms
+	var b := proportional_setpoint_weight if setpoint_weighting_enabled else 1.0
+	var lines := PackedStringArray()
+	lines.append("e = r - y = %s - %s = %s" % [n.call(setpoint), n.call(measurement), n.call(e)])
+	if b == 1.0:
+		lines.append("P = Kp·e = %s·%s = %s" % [n.call(proportional_gain), n.call(e), n.call(t["p"])])
+	else:
+		lines.append("P = Kp·(b·r - y) = %s·(%s·%s - %s) = %s" % [n.call(proportional_gain),
+			n.call(b), n.call(setpoint), n.call(measurement), n.call(t["p"])])
+	var integral_rule := "Ki·(e + e_prev)/2·Δt" if integral_method == IntegralMethod.TRAPEZOIDAL else "Ki·e·Δt"
+	lines.append("I = I_prev + %s = %s   (Ki = %s)" % [integral_rule, n.call(t["i"]),
+		n.call(integral_gain)])
+	var d_signal := "y (measurement)" if derivative_on_measurement else "e"
+	var d_line := "D = Kd·Δ%s/Δt = %s   (Kd = %s)" % [
+		"(-y)" if derivative_on_measurement else "e", n.call(t["d"]), n.call(derivative_gain)]
+	if derivative_filter_enabled:
+		d_line += ", low-pass filtered (Tf = %s s)" % n.call(derivative_filter_tau)
+	lines.append(d_line)
+	if derivative_on_measurement:
+		lines.append("   (D acts on %s, so setpoint steps cause no kick)" % d_signal)
+	if feedforward_enabled:
+		lines.append("FF = kS·sign(v) + kV·v + kA·a + kG = %s   (v = %s, a = %s)" % [
+			n.call(t["ff"]), n.call(reference_velocity), n.call(reference_acceleration)])
+	var sum_rule := "P + I + D + FF" if feedforward_enabled else "P + I + D"
+	lines.append("sum = %s = %s" % [sum_rule, n.call(t["sum"])])
+	if use_output_limits:
+		var limited := clampf(t["sum"], output_min, output_max)
+		lines.append("u = clamp(sum, %s, %s) = %s%s" % [n.call(output_min), n.call(output_max),
+			n.call(limited), "   (CLIPPED)" if _is_clipped else ""])
+	else:
+		lines.append("u = sum = %s" % n.call(t["sum"]))
+	return "\n".join(lines)

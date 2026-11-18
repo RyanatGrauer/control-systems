@@ -6,7 +6,8 @@
 #   Everything starts OFF, so the default loop is ideal.
 #
 # HOW IT FITS
-#   Writes straight into Simulation.sensor and Simulation.actuator; the very
+#   Shows the current settings (defaults from apply_defaults(), possibly
+#   changed by a scenario) and writes into Simulation.sensor/actuator; the very
 #   next controller tick uses the new settings (they work live, mid-run).
 #   Slider ranges are scaled from the plant's own input/output ranges, so the
 #   same panel suits every plant with no per-plant UI code.
@@ -37,6 +38,26 @@ const LOWPASS_DEFAULT_S: float = 0.05
 var _simulation: Simulation
 
 
+# Plant-scaled starting values for every setting (effects stay OFF). Called
+# once when a scenario loads, BEFORE the scenario's own overrides, so the
+# panel below only reads the values and never overwrites a scenario's choice.
+static func apply_defaults(simulation: Simulation) -> void:
+	var output_info := simulation.plant.get_output_definition()
+	var input_info := simulation.plant.get_input_definition()
+	var output_span := output_info.max_value - output_info.min_value
+	var input_span := input_info.max_value - input_info.min_value
+	var sensor := simulation.sensor
+	var actuator := simulation.actuator
+	sensor.noise_std = output_span * NOISE_DEFAULT_FRACTION
+	sensor.resolution = output_span * RESOLUTION_DEFAULT_FRACTION
+	sensor.delay_s = DELAY_DEFAULT_S
+	sensor.lowpass_tau = LOWPASS_DEFAULT_S
+	actuator.saturation_min = input_info.min_value
+	actuator.saturation_max = input_info.max_value
+	actuator.slew_rate = input_span * SLEW_DEFAULT_SPANS_PER_S
+	actuator.deadband = input_span * DEADBAND_DEFAULT_FRACTION
+
+
 func setup(simulation: Simulation) -> void:
 	_simulation = simulation
 	add_theme_constant_override("separation", 6)
@@ -49,7 +70,6 @@ func setup(simulation: Simulation) -> void:
 
 	_add_heading("Sensor (what the controller sees)")
 
-	sensor.noise_std = output_span * NOISE_DEFAULT_FRACTION
 	_add_effect("Noise", sensor.noise_enabled,
 			func(on: bool) -> void: sensor.noise_enabled = on,
 			[_scaled_like(output_info, "noise_std", "Noise size (σ)",
@@ -57,7 +77,6 @@ func setup(simulation: Simulation) -> void:
 				"Typical size of the random error added to each reading.")],
 			[func(value: float) -> void: sensor.noise_std = value])
 
-	sensor.resolution = output_span * RESOLUTION_DEFAULT_FRACTION
 	_add_effect("Quantization", sensor.quantization_enabled,
 			func(on: bool) -> void: sensor.quantization_enabled = on,
 			[_scaled_like(output_info, "resolution", "Resolution (one count)",
@@ -66,7 +85,6 @@ func setup(simulation: Simulation) -> void:
 				"Readings snap to whole multiples of this, like encoder ticks.").with_log_slider()],
 			[func(value: float) -> void: sensor.resolution = value])
 
-	sensor.delay_s = DELAY_DEFAULT_S
 	_add_effect("Measurement delay", sensor.delay_enabled,
 			func(on: bool) -> void: sensor.delay_enabled = on,
 			[QuantityInfo.new("delay", "Delay", "s").with_display("ms", 1000.0) \
@@ -74,7 +92,6 @@ func setup(simulation: Simulation) -> void:
 				.with_description("How old each reading is when the controller gets it.")],
 			[func(value: float) -> void: sensor.delay_s = value])
 
-	sensor.lowpass_tau = LOWPASS_DEFAULT_S
 	_add_effect("Low-pass filter", sensor.lowpass_enabled,
 			func(on: bool) -> void: sensor.lowpass_enabled = on,
 			[QuantityInfo.new("lowpass_tau", "Filter time constant (τ)", "s") \
@@ -85,8 +102,6 @@ func setup(simulation: Simulation) -> void:
 
 	_add_heading("Actuator (what reaches the plant)")
 
-	actuator.saturation_min = input_info.min_value
-	actuator.saturation_max = input_info.max_value
 	_add_effect("Saturation", actuator.saturation_enabled,
 			func(on: bool) -> void: actuator.saturation_enabled = on,
 			[_scaled_like(input_info, "saturation_min", "Lowest output",
@@ -98,7 +113,6 @@ func setup(simulation: Simulation) -> void:
 			[func(value: float) -> void: actuator.saturation_min = value,
 			func(value: float) -> void: actuator.saturation_max = value])
 
-	actuator.slew_rate = input_span * SLEW_DEFAULT_SPANS_PER_S
 	_add_effect("Slew-rate limit", actuator.slew_enabled,
 			func(on: bool) -> void: actuator.slew_enabled = on,
 			[_scaled_like(input_info, "slew_rate", "Fastest change",
@@ -108,7 +122,6 @@ func setup(simulation: Simulation) -> void:
 				"/s").with_log_slider()],
 			[func(value: float) -> void: actuator.slew_rate = value])
 
-	actuator.deadband = input_span * DEADBAND_DEFAULT_FRACTION
 	_add_effect("Deadband", actuator.deadband_enabled,
 			func(on: bool) -> void: actuator.deadband_enabled = on,
 			[_scaled_like(input_info, "deadband", "Deadband size",

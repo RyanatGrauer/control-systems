@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="Scenario" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/scenario.gd" id="1_scenario"]
+[ext_resource type="Script" path="res://plants/hotend/hotend_plant.gd" id="2_plant"]
+
+[resource]
+script = ExtResource("1_scenario")
+title = "Hotend: integral windup"
+notes = "This loop already has PI control (Kp = 2 W/°C, Ki = 0.1 W/(°C·s)) and no anti-windup.\n1. Watch the warm-up: the heater sits at its 40 W limit, but the integral keeps growing. Why does it overshoot so badly?\n2. Advanced PID: switch anti-windup to \"clamping\", press Reset, and compare.\n3. Try \"back-calculation\" and change its tracking gain.\nTip: Time scale 4×."
+start_mode = 1
+pid_settings = Dictionary[String, Variant]({"proportional_gain": 2.0, "integral_gain": 0.1, "anti_windup": 0})
+plant_script = ExtResource("2_plant")

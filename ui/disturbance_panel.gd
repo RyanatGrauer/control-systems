@@ -15,6 +15,7 @@
 #   Writes into Simulation.disturbance_generator. Sizes are in the plant's
 #   disturbance units (Plant.get_disturbance_definition()). Step load and drift
 #   take effect at their times in the current run; press Reset to rerun from 0.
+#   The disturbance is plotted on the "Load" tab.
 class_name DisturbancePanel
 extends VBoxContainer
 
@@ -26,6 +27,17 @@ const POKE_DEFAULT_FRACTION: float = 1.0
 var _simulation: Simulation
 
 
+# Plant-scaled starting sizes (sources stay OFF). Called when a scenario loads,
+# before the scenario's overrides; setup() then only reads them.
+static func apply_defaults(simulation: Simulation) -> void:
+	var generator := simulation.disturbance_generator
+	var load_info := simulation.plant.get_disturbance_definition()
+	var load_max := maxf(absf(load_info.max_value), absf(load_info.min_value))
+	generator.step_load = load_max * STEP_DEFAULT_FRACTION
+	generator.random_std = load_max * RANDOM_DEFAULT_FRACTION
+	generator.poke_strength = load_max * POKE_DEFAULT_FRACTION
+
+
 func setup(simulation: Simulation) -> void:
 	_simulation = simulation
 	add_theme_constant_override("separation", 6)
@@ -33,11 +45,10 @@ func setup(simulation: Simulation) -> void:
 	var load_info := simulation.plant.get_disturbance_definition()
 	var load_max := maxf(absf(load_info.max_value), absf(load_info.min_value))
 
-	var intro := _make_hint("On this plant the disturbance is the %s (%s). Watch it on the Disturbance plot tab." % [
+	var intro := _make_hint("On this plant the disturbance is the %s (%s). Watch it on the Load plot tab." % [
 			load_info.display_name.to_lower(), load_info.get_shown_unit()])
 	add_child(intro)
 
-	generator.step_load = load_max * STEP_DEFAULT_FRACTION
 	_add_effect("Step load", generator.step_enabled,
 			func(on: bool) -> void: generator.step_enabled = on,
 			[_load_info(load_info, "step_load", "Load size", -load_max, load_max, generator.step_load,
@@ -47,7 +58,6 @@ func setup(simulation: Simulation) -> void:
 			[func(v: float) -> void: generator.step_load = v,
 			func(v: float) -> void: generator.step_time = v])
 
-	generator.random_std = load_max * RANDOM_DEFAULT_FRACTION
 	_add_effect("Random load", generator.random_enabled,
 			func(on: bool) -> void: generator.random_enabled = on,
 			[_load_info(load_info, "random_std", "Typical size", 0.0, load_max, generator.random_std,
@@ -59,7 +69,6 @@ func setup(simulation: Simulation) -> void:
 			func(v: float) -> void: generator.random_tau = v])
 
 	add_child(_make_hint("Poke: click the plant view (right-click pokes the other way)."))
-	generator.poke_strength = load_max * POKE_DEFAULT_FRACTION
 	var poke_slider := LabeledSlider.new()
 	add_child(poke_slider)
 	poke_slider.setup(_load_info(load_info, "poke_strength", "Poke strength", 0.0, load_max,
@@ -89,8 +98,12 @@ func _build_drift_controls(generator: DisturbanceGenerator) -> void:
 	menu.clip_text = true
 	for info in definitions:
 		menu.add_item(info.display_name)
-	if generator.drift_key == "":
-		generator.drift_key = definitions[0].key
+	var selected := 0
+	for index in definitions.size():
+		if definitions[index].key == generator.drift_key:
+			selected = index
+	generator.drift_key = definitions[selected].key
+	menu.select(selected)
 	menu.item_selected.connect(func(index: int) -> void:
 		generator.drift_key = definitions[index].key)
 	body.add_child(menu)

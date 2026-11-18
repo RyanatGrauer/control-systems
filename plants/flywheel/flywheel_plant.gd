@@ -130,6 +130,25 @@ func get_feedforward_definitions() -> Array[QuantityInfo]:
 	return make_feedforward_definitions(2.0, 0.1, 0.1, 12.0)
 
 
+func get_equation_text(state: PackedFloat64Array, plant_input: float,
+		disturbance: float) -> String:
+	var w := state[0]
+	var j := get_parameter("inertia")
+	var kt := get_parameter("torque_constant")
+	var r := get_parameter("resistance")
+	var b := get_parameter("viscous_friction")
+	var current := (plant_input - kt * w) / r
+	var acceleration := compute_derivative(state, plant_input, disturbance, 0.0)[0]
+	return "\n".join([
+		"i = (V - Kt·ω) / R",
+		"   = (%s - %s·%s) / %s = %s A" % [num(plant_input), num(kt), num(w), num(r), num(current)],
+		"J·dω/dt = Kt·i - b·ω - T_load",
+		"%s·dω/dt = %s·%s - %s·%s - %s" % [num(j), num(kt), num(current), num(b), num(w), num(disturbance)],
+		"dω/dt = %s rad/s²   (ω = %s rad/s = %s RPM)" % [num(acceleration), num(w),
+			num(w * RAD_PER_S_TO_RPM)],
+	])
+
+
 func get_visual_scene_path() -> String:
 	return "res://plants/flywheel/flywheel_visual.tscn"
 

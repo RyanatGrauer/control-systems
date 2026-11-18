@@ -1,12 +1,13 @@
 # plant_catalog.gd
 #
 # PURPOSE
-#   The list of plants the toolbar's plant picker offers, in teaching order.
+#   Every plant TYPE in the project, in teaching order. The app itself picks
+#   plants through scenario files (res://scenarios/); this list is for the
+#   tests, which check every plant (consistency, UI smoke tests).
 #
 # HOW IT FITS
-#   TEMPORARY: in stage 15 this is replaced by scenario resources (a scenario
-#   bundles a plant with its settings), and the picker lists scenarios instead.
-#   To add a plant now: append a line to PLANT_SCRIPTS.
+#   When you add a plant, append it here so the tests cover it, and add a
+#   scenario file so students can choose it.
 class_name PlantCatalog
 extends RefCounted
 

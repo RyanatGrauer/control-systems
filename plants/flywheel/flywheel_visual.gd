@@ -157,6 +157,7 @@ func _build_wheel() -> void:
 	blur_disc.mesh = blur_mesh
 	blur_disc.material_override = _blur_material
 	blur_disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	blur_disc.visible = DisplaySettings.motion_blur  # Graphics setting
 	mount.add_child(blur_disc)
 
 

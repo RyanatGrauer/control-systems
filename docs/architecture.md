@@ -1,6 +1,6 @@
 # Control Lab architecture
 
-This file describes the code as it stands now (Milestone C). README.md is the spec; this is the map.
+This file describes the code as it stands now (Milestone D, in progress). README.md is the spec; this is the map.
 
 ## Folder layout
 
@@ -13,22 +13,39 @@ plants/hotend/   plant #2 (temperature, dead time, heat-only)
 plants/mass_spring_damper/  plant #3
 plants/servo/    plant #4 (DC motor position)
 plants/elevator/ plant #5 (gravity, static friction, hard stops)
-plants/plant_catalog.gd     list of plants for the toolbar picker (replaced by scenarios in stage 15)
+plants/plant_catalog.gd     every plant type (used by the tests to cover all plants)
+scenarios/       scenario files (.tres, data only): what the toolbar's picker lists
+core/scenario.gd, core/scenario_catalog.gd   the Scenario resource and the folder scan
 controllers/     Controller base class, ManualController, PidController
 signal_blocks/   SetpointGenerator (constant/step/square/ramp/sine), TrapezoidalProfile,
                  Sensor (noise/quantization/delay/low-pass), Actuator (deadband/saturation/slew),
                  DisturbanceGenerator (step/random/poke/parameter drift)
 core/delay_line.gd          fixed-step delay buffer (sensor delay, plant dead time)
+core/save_store.gd          the student's save file: schema, validation, temp-file writes, save codes
+core/csv_export.gd          a run as CSV (README 7.8)
+core/web_platform.gd        ALL browser-only code (downloads, file picker, persistent storage)
 core/step_metrics.gd        rise time, overshoot, settling, steady-state error, IAE, effort
-ui/              main screen, toolbar, panels (controller, PID + feedforward + advanced PID, setpoint,
-                 parameters, settings,
-                 sensor & actuator, disturbances), setpoint bar, sliders, strip chart,
-                 term bars, metrics bar, colour language
+ui/              main screen, toolbar, setpoint bar, sliders, strip chart, term bars, metrics bar,
+                 panels (controller, PID + feedforward + advanced PID, snapshots, setpoint,
+                 sensor & actuator, disturbances, parameters, settings, display & graphics, save & export),
+                 block diagram, equations view, ghost runs, DisplaySettings, colour language
+plants/common/ghost.gdshader  the glowing setpoint-ghost material
 tests/           in-engine test runner, test scripts, test-only plants/controllers
 docs/            these notes
 ```
 
-`scenarios/` and `modes/` from README §9 will be created when their stages begin (15 and 20).
+`modes/` from README §9 will be created when its stage begins (20).
+
+## Scenarios (stage 15)
+
+A `Scenario` resource bundles a plant script, plant parameters, the start mode, notes, and override dictionaries for the PID, setpoint, motion profile, sensor, actuator and disturbances (README §9: "scenarios are data"). See `docs/writing_a_scenario.md`. Loading one (`main_screen._load_scenario`) happens in this order:
+1. `create_plant()`.
+2. Controllers.
+3. Each panel's plant-scaled `apply_defaults()`.
+4. `apply_settings()`, which applies the overrides by variable name. An unknown name is a warning in the app and a failure in `test_scenarios.gd`.
+5. The UI is built, and only *reads* the resulting values.
+
+Reset restarts the run but keeps the student's changes. Choosing the scenario again reloads it. The Notes tab (first tab, right of the output plot) shows the scenario's notes.
 
 ## The big rule: the simulation never depends on the UI
 
@@ -68,7 +85,7 @@ A plant extends `Plant` and describes itself with `QuantityInfo` metadata: param
 Every non-ideality is a separate checkbox, off by default (side panel: **Sensor & actuator**, **Disturbances**).
 * `Sensor`: delay → noise → quantization → low-pass, in that order. Its delay reads a `DelayLine` filled every physics substep, so it's exact to 1 ms. While any sensor effect is on, the output plot also shows the green **True** output.
 * `Actuator`: deadband → saturation → slew limit. This is separate from the PID's own "Limit output" (the controller's limits, which anti-windup watches).
-* `DisturbanceGenerator`: a step load, a random load (Ornstein–Uhlenbeck: smooth wandering), a poke, and parameter drift. Clicking the plant view (without dragging) pokes +, right-click pokes −. Drift multiplies one plant parameter at a set time, and `reset()` restores it *before* the initial state is computed. Disturbance values are plotted on the **Disturbance** tab.
+* `DisturbanceGenerator`: a step load, a random load (Ornstein–Uhlenbeck: smooth wandering), a poke, and parameter drift. Clicking the plant view (without dragging) pokes +, right-click pokes −. Drift multiplies one plant parameter at a set time, and `reset()` restores it *before* the initial state is computed. Disturbance values are plotted on the **Load** tab.
 * Slider ranges for all of these are scaled from each plant's own input/output/disturbance ranges, so there is no per-plant UI code.
 
 ## Determinism
@@ -109,7 +126,61 @@ Each plant supplies its own PID slider ranges and defaults through `get_pid_gain
 
 ## Plots
 
-The bottom area has the output chart on the left and tabs on the right: Command, P/I/D terms (plus FF), Error, and Disturbance. The term plot uses separate lines rather than stacked areas (see the Milestone B review notes). The PID panel also shows live P/I/D/Sum bars. `StripChart` reads a `RunRecorder` (a ring buffer, 120 s at 100 Hz). Features: multiple traces, legend, auto/locked Y axis, nice ticks (`ChartAxis`), hover readout, and scrubbing while paused (drag). It decimates by keeping the min and max per pixel column. Colours come from `SignalColors`. The setpoint is always dashed, so colour is never the only cue.
+The bottom area has the output chart on the left and tabs on the right: Command, P/I/D terms (plus FF), Error, Load (disturbance), Diagram and Equations. The term plot uses separate lines rather than stacked areas (see the Milestone B review notes). The PID panel also shows live P/I/D/Sum bars. `StripChart` reads a `RunRecorder` (a ring buffer, 120 s at 100 Hz). Features: multiple traces, legend, auto/locked Y axis, nice ticks (`ChartAxis`), hover readout, and scrubbing while paused (drag). It decimates by keeping the min and max per pixel column. Colours come from `SignalColors`. The setpoint is always dashed, so colour is never the only cue.
+
+## Snapshots and ghosts (stage 16)
+
+**Tuning slots A–D** (side panel › Snapshots): **Save** stores `PidController.get_tuning()`, which is every PID setting (gains, switches, feedforward), built from the script's variable list so new settings are included automatically. **Load + rerun** applies a slot's tuning, switches to PID, rebuilds the PID panel, and restarts from t = 0 with the same seed. Slots are kept per scenario for the session; saving them to disk is stage 19.
+
+**Ghost runs**: every Reset (and every Load) turns the run that is ending (if it lasted ≥ 1 s) into a `GhostRun`, a trimmed copy of its recorder. The newest 3 are drawn faded behind the live lines, for traces marked `ghost = true` (Measured, Applied). A ghost is labelled with a slot letter only if the whole run used that slot's exact tuning in PID mode; otherwise it is "run N". Ghosts are cleared when the scenario changes, because a different plant isn't comparable. Plot options: **Ghosts** on/off and **Clear ghosts**.
+
+## Teaching tabs (stage 17)
+
+* **Diagram** (`ui/block_diagram.gd`) draws the loop from README §3 with the 2D API.
+  * Each wire shows its symbol above and its live value below, in that signal's plot colour.
+  * Sensor and actuator list the effects that are on, with an amber border when any is on. The actuator turns red ("SATURATED") when it clips. The controller says "(clipped)" when the PID's own limits clip.
+  * Clicking a block opens and scrolls to its side-panel section.
+* **Equations** (`ui/equations_view.gd`) shows `Plant.get_equation_text()` and `Controller.get_equation_text()`: the ODE and the discrete PID update with the current numbers substituted in. It refreshes 8× per second. Each plant writes its own maths next to its code (override `get_equation_text`; the base class falls back to listing the state and its rate of change). The ODE uses `Simulation.plant_input`, the input after any dead time.
+* Transfer-function forms wait for the Advanced Math setting.
+
+## Presenter mode and graphics (stage 18)
+
+`ui/display_settings.gd` (`DisplaySettings`) holds app-wide display choices as static variables.
+
+* **Graphics:** each effect has its own switch: MSAA, shadows, 3D resolution, flywheel motion blur, and the glowing ghost. The Low / Medium / High presets set them all at once, and changing one switch makes the preset "Custom". `PlantView.apply_graphics()` rebuilds the 3D visual so lights and materials pick up the changes (the camera resets).
+* **Presenter mode** (F2 or the toolbar button):
+  * Sets the window's `content_scale_factor` to 1.25.
+  * Plots get 1.7× thicker lines and black backgrounds; the page background turns black.
+  * The advanced side-panel sections are hidden (snapshots, plant parameters, simulation settings, save).
+  * The toolbar drops Seed and the "Time scale" title so it still fits. `test_presenter_layout_fits` checks the whole layout's minimum size against 1280×720 / 1.25. **If you add toolbar items, run that test.**
+* **Setpoint ghost:** `plants/common/ghost.gdshader` gives a rim glow and a slow pulse. `make_ghost_material()` falls back to a flat colour when the effect is off.
+* **Saturation highlight:** while the actuator or the PID's own limit clips the command, the plant view shows a red "SATURATED" badge, and the Diagram tab turns the actuator red. `PlantVisual3D.show_saturation()` is a hook for plant-specific cues.
+
+## Saving and export (stage 19, README §7.8, §7.10, §7.11)
+
+* **`SaveStore`** holds the one save file, `user://save.json`. It contains:
+  * settings (graphics, presenter mode, last scenario),
+  * tuning snapshots per scenario (keyed by scenario title, so renaming a scenario orphans its snapshots),
+  * empty `challenges` / `lessons` sections reserved for Milestone E.
+* **Rules** (README §7.10):
+  * Saves are JSON only, never Godot resources.
+  * Every load path goes through `SaveStore.validate()`: disk, imported file and pasted save code alike. Unknown keys are dropped. Values are converted to the expected type or replaced by their default. A snapshot's wrong-typed values are dropped, so loading leaves those settings unchanged.
+  * A file that doesn't parse is renamed `save.corrupt-<time>.json`, and the student is told.
+  * Writes go to `save.json.tmp`, which is closed (this flushes to IndexedDB on the Web) and then renamed over `save.json`.
+  * There's a `schema_version` plus `migrate()` for future format changes.
+* **Autosave:** `main_screen.gd` saves 1.5 s after the last change, never on quit (browsers don't reliably send a quit event). A change made in the last 1.5 s before a tab closes is therefore lost.
+* **Save & export panel** (`ui/save_panel.gd`):
+  * Export run (CSV): `CsvExport` writes `#` comment lines (scenario, controller and gains, seed, rates, units), then one row per controller tick in SI units.
+  * Export / Import save file.
+  * Copy / Paste save code: `CLAB1:` + base64(gzip(JSON)).
+  * Reset all progress, which asks for confirmation.
+* **Web vs desktop:** on the Web, files go through `WebPlatform`: `JavaScriptBridge.download_buffer` for downloads and a hidden `<input type=file>` for import. `WebPlatform` also asks for persistent storage (often refused inside itch.io's iframe; that's fine). On desktop, the panel uses Godot's FileDialog (native).
+* **Verified in a Chrome Web build:**
+  * The save lands at `/userfs/control_lab_7f3k2q/save.json` in IndexedDB.
+  * The scenario and presenter mode survive a page reload.
+  * The CSV and save downloads have the right contents.
+  * Importing through the browser file picker applies the file.
+* **Tests:** the test runner points `SaveStore.save_path` at `user://test_saves/` and deletes it afterwards, so tests never touch a real save.
 
 ## Storage (README §7.10–7.11)
 
@@ -135,6 +206,7 @@ The bottom area has the output chart on the left and tabs on the right: Command,
 | `gain_select_p` / `gain_select_i` / `gain_select_d` | P / I / D, PID mode |
 | `gain_nudge_up` / `gain_nudge_down` | ] / [ (×1.1 / ÷1.1 on the selected gain; from 0, ] jumps to 1% of the gain's max) |
 | `setpoint_flip` | S (swap target and start level, to re-trigger a step response) |
+| `presenter_toggle` | F2 (presenter mode) |
 
 Mouse: drag the plant view to orbit and scroll to zoom. Click it to poke the plant, and right-click to poke the other way. The mouse wheel never changes slider values; it only scrolls panels.
 

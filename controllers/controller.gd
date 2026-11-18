@@ -41,6 +41,11 @@ func take_over(_previous_command: float, _setpoint: float, _measurement: float) 
 	pass
 
 
+# The controller's update written out with live numbers (Equations tab).
+func get_equation_text(_setpoint: float, _measurement: float) -> String:
+	return ""
+
+
 # Each term's contribution from the most recent tick, for stacked plots.
 # Keys used across the project: "p", "i", "d", "ff". Manual control has none.
 func get_term_contributions() -> Dictionary:

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Scenario" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/scenario.gd" id="1_scenario"]
+[ext_resource type="Script" path="res://plants/elevator/elevator_plant.gd" id="2_plant"]
+
+[resource]
+script = ExtResource("1_scenario")
+title = "Elevator / lift"
+notes = "1. Manual first: lift the carriage to the ghost and hold it. How much voltage does it take just to hold still?\n2. Switch to PID (P only). The carriage sags below the target. That gap is gravity.\n3. Open Feedforward, turn it on, and raise kG until the sag disappears (about 2.5 V).\n4. Turn on a motion profile (Setpoint panel) and add kV for smooth, fast moves. Flip the setpoint (S) to test."
+start_mode = 0
+plant_script = ExtResource("2_plant")

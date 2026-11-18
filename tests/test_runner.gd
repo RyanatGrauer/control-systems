@@ -24,6 +24,7 @@
 extends Node
 
 const TEST_FOLDER: String = "res://tests/"
+const TEST_SAVE_FOLDER: String = "user://test_saves/"
 
 
 # Counts errors reported by the engine (script errors, push_error, ...).
@@ -47,6 +48,8 @@ class ErrorCounter:
 func _ready() -> void:
 	# Deferred: while _ready() runs the scene root is still setting up its
 	# children, so tests that add nodes to the tree (UI smoke tests) would fail.
+	# Never touch a real student save: point saving at a scratch folder.
+	SaveStore.save_path = TEST_SAVE_FOLDER + "save.json"
 	_run_all_tests.call_deferred()
 
 
@@ -57,9 +60,17 @@ func _run_all_tests() -> void:
 	OS.add_logger(error_counter)
 
 	for file_name in _find_test_files():
-		var script: GDScript = load(TEST_FOLDER + file_name)
-		var test_object: TestCase = script.new()
 		print("\n== %s" % file_name)
+		# A test file with a parse error can't be created. Count it as a
+		# failure and carry on, so the run still finishes with exit code 1
+		# (instead of stopping here and never quitting).
+		var script := load(TEST_FOLDER + file_name) as GDScript
+		if script == null or not script.can_instantiate():
+			total_tests += 1
+			failed_tests += 1
+			print("  FAIL  (could not load this file: see the parse error above)")
+			continue
+		var test_object: TestCase = script.new()
 		for method in test_object.get_method_list():
 			var method_name: String = method["name"]
 			if not method_name.begins_with("test_"):
@@ -82,6 +93,7 @@ func _run_all_tests() -> void:
 			failed_tests])
 	print("ALL TESTS PASSED" if failed_tests == 0 else "SOME TESTS FAILED")
 	OS.remove_logger(error_counter)
+	_delete_test_saves()
 	get_tree().quit(0 if failed_tests == 0 else 1)
 
 
@@ -93,3 +105,9 @@ func _find_test_files() -> PackedStringArray:
 			found.append(file_name)
 	found.sort()
 	return found
+
+
+func _delete_test_saves() -> void:
+	for file_name in DirAccess.get_files_at(TEST_SAVE_FOLDER):
+		DirAccess.remove_absolute(TEST_SAVE_FOLDER + file_name)
+	DirAccess.remove_absolute(TEST_SAVE_FOLDER)

@@ -34,6 +34,11 @@ func _init(title: String, start_open: bool = true) -> void:
 	_on_header_toggled(start_open)
 
 
+# Open (or close) the section from code, e.g. when a block-diagram block is clicked.
+func set_open(is_open: bool) -> void:
+	_header.button_pressed = is_open  # emits toggled -> _on_header_toggled
+
+
 func _on_header_toggled(is_open: bool) -> void:
 	body.visible = is_open
 	# "v" when open, ">" when closed: plain ASCII so every font can draw it.

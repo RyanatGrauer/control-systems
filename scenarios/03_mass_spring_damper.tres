@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Scenario" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/scenario.gd" id="1_scenario"]
+[ext_resource type="Script" path="res://plants/mass_spring_damper/mass_spring_damper_plant.gd" id="2_plant"]
+
+[resource]
+script = ExtResource("1_scenario")
+title = "Mass-spring-damper"
+notes = "1. Manual first: push the block to the orange ghost and hold it there. The spring fights you the further it goes.\n2. Switch to PID (P only). More Kp = faster, but bouncier. Why does it never quite reach the target?\n3. Add Kd. Watch the bouncing die out. Too much Kd makes it sluggish.\n4. Press S (Flip setpoint) to repeat the step while you tune. Aim for less than 10% overshoot."
+start_mode = 0
+plant_script = ExtResource("2_plant")

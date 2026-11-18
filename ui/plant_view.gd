@@ -29,6 +29,8 @@ var _viewport: SubViewport
 var _scene_area: Control
 var _caption: Label
 var _visual: PlantVisual3D
+var _plant: Plant
+var _saturation_badge: Label
 var _is_orbiting: bool = false
 var _drag_distance: float = 0.0
 
@@ -59,9 +61,23 @@ func _init() -> void:
 
 	_viewport = SubViewport.new()
 	_viewport.own_world_3d = true
-	_viewport.msaa_3d = Viewport.MSAA_2X  # TUNABLE (Graphics "Low" preset will turn off)
+	_viewport.msaa_3d = DisplaySettings.msaa
+	_viewport.scaling_3d_scale = DisplaySettings.render_scale
 	_viewport.handle_input_locally = false
 	container.add_child(_viewport)
+
+	# Red badge while the actuator (or the PID's own limit) clips the command.
+	_saturation_badge = Label.new()
+	_saturation_badge.text = " SATURATED: the input is at its limit "
+	_saturation_badge.add_theme_color_override("font_color", Color.WHITE)
+	var badge_style := StyleBoxFlat.new()
+	badge_style.bg_color = Color(0.75, 0.12, 0.12)
+	badge_style.set_corner_radius_all(4)
+	_saturation_badge.add_theme_stylebox_override("normal", badge_style)
+	_saturation_badge.position = Vector2(8.0, 8.0)
+	_saturation_badge.visible = false
+	_saturation_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_scene_area.add_child(_saturation_badge)
 
 	var reset_camera_button := Button.new()
 	reset_camera_button.text = "Reset camera"
@@ -86,6 +102,7 @@ func load_plant_visual(plant: Plant) -> void:
 	if _visual != null:
 		_visual.queue_free()
 		_visual = null
+	_plant = plant
 	_caption.text = plant.get_description()
 	var scene_path := plant.get_visual_scene_path()
 	if scene_path == "":
@@ -104,6 +121,19 @@ func show_state(simulation: Simulation) -> void:
 		return
 	_visual.show_state(simulation.plant, simulation.state, simulation.setpoint,
 			simulation.applied_input, simulation.get_time())
+	var pid := simulation.controller as PidController
+	var saturated := simulation.actuator.is_saturated or (pid != null and pid.is_output_clipped())
+	_saturation_badge.visible = saturated
+	_visual.show_saturation(saturated)
+
+
+# Re-apply DisplaySettings (Graphics panel). Rebuilds the 3D visual so lights
+# and materials pick up the new switches; the camera goes back to its default.
+func apply_graphics() -> void:
+	_viewport.msaa_3d = DisplaySettings.msaa
+	_viewport.scaling_3d_scale = DisplaySettings.render_scale
+	if _plant != null:
+		load_plant_visual(_plant)
 
 
 func reset_visual() -> void:

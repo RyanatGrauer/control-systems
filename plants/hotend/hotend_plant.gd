@@ -116,6 +116,22 @@ func get_feedforward_definitions() -> Array[QuantityInfo]:
 	return make_feedforward_definitions(10.0, 50.0, 50.0, 40.0)
 
 
+func get_equation_text(state: PackedFloat64Array, plant_input: float,
+		disturbance: float) -> String:
+	var t := state[0]
+	var c := get_parameter("heat_capacity")
+	var r := get_parameter("thermal_resistance")
+	var ambient := get_parameter("ambient_temperature")
+	var rate := compute_derivative(state, plant_input, disturbance, 0.0)[0]
+	return "\n".join([
+		"C·dT/dt = P(t - L) - (T - T_room)/R - P_fan",
+		"%s·dT/dt = %s - (%s - %s)/%s - %s" % [num(c), num(maxf(plant_input, 0.0)), num(t),
+			num(ambient), num(r), num(disturbance)],
+		"dT/dt = %s °C/s" % num(rate),
+		"P(t - L) is the heater power from L = %s s ago (dead time)." % num(get_parameter("dead_time")),
+	])
+
+
 func get_visual_scene_path() -> String:
 	return "res://plants/hotend/hotend_visual.tscn"
 

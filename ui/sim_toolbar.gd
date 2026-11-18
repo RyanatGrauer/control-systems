@@ -1,7 +1,7 @@
 # sim_toolbar.gd
 #
 # PURPOSE
-#   The top bar (README 7.1): plant picker, Play/Pause, Step, Reset, the
+#   The top bar (README 7.1): scenario picker, Play/Pause, Step, Reset, the
 #   time-scale slider, the random seed, a simulated-time readout, a "running
 #   slower than real time" warning, and a fullscreen toggle.
 #
@@ -9,7 +9,6 @@
 #   It only emits signals; main_screen.gd decides what they do. That keeps the
 #   toolbar free of simulation logic. main_screen.gd calls the update_*()
 #   functions every frame so the bar shows the current state.
-#   The plant picker is temporary: stage 15 turns it into the scenario picker.
 #   (The Presenter toggle arrives in stage 18.)
 class_name SimToolbar
 extends PanelContainer
@@ -19,12 +18,15 @@ signal step_pressed
 signal reset_pressed
 signal time_scale_changed(new_scale: float)
 signal seed_changed(new_seed: int)
-signal plant_selected(index: int)
+signal scenario_selected(index: int)
+signal presenter_pressed
 
 # TUNABLE: how long the "slower than real time" warning stays visible after
 # the last slow frame, so it does not flicker.
 const SLOW_WARNING_HOLD_S: float = 1.0
 
+var _presenter_button: Button
+var _hidden_when_compact: Array[Control] = []  # presenter mode drops these to fit
 var _play_button: Button
 var _time_scale_slider: HSlider
 var _time_scale_label: Label
@@ -34,19 +36,26 @@ var _slow_label: Label
 var _slow_warning_timer: float = 0.0
 
 
-func _init(plant_names: PackedStringArray, selected_plant: int) -> void:
+func _init(scenario_titles: PackedStringArray, selected_scenario: int) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	add_child(row)
 
-	var plant_menu := OptionButton.new()
-	plant_menu.focus_mode = Control.FOCUS_NONE
-	plant_menu.tooltip_text = "Choose the system to control"
-	for plant_name in plant_names:
-		plant_menu.add_item(plant_name)
-	plant_menu.select(selected_plant)
-	plant_menu.item_selected.connect(plant_selected.emit)
-	row.add_child(plant_menu)
+	var scenario_menu := OptionButton.new()
+	scenario_menu.focus_mode = Control.FOCUS_NONE
+	scenario_menu.tooltip_text = "Choose a scenario (a system to control, set up for a lesson)"
+	for scenario_title in scenario_titles:
+		scenario_menu.add_item(scenario_title)
+	scenario_menu.select(selected_scenario)
+	# Fixed width (long titles are clipped) so the toolbar fits presenter mode.
+	scenario_menu.fit_to_longest_item = false
+	scenario_menu.clip_text = true
+	scenario_menu.custom_minimum_size = Vector2(230.0, 0.0)  # TUNABLE
+	# The popup's index_pressed fires even when the CURRENT scenario is chosen
+	# again, so re-choosing it reloads it (restoring all its settings).
+	# (OptionButton.item_selected only fires on a change.)
+	scenario_menu.get_popup().index_pressed.connect(scenario_selected.emit)
+	row.add_child(scenario_menu)
 	row.add_child(VSeparator.new())
 
 	_play_button = _make_button("Play", "Start or pause the simulation (Space)")
@@ -66,6 +75,7 @@ func _init(plant_names: PackedStringArray, selected_plant: int) -> void:
 	var speed_title := Label.new()
 	speed_title.text = "Time scale"
 	row.add_child(speed_title)
+	_hidden_when_compact.append(speed_title)
 
 	# Log mapping: time scale = 4^position. Position 0 is 1x (real time), the
 	# right end (1) is 4x, the left end is MIN_TIME_SCALE (0.1x). Equal slider
@@ -94,6 +104,7 @@ func _init(plant_names: PackedStringArray, selected_plant: int) -> void:
 	seed_title.text = "Seed"
 	seed_title.tooltip_text = "Random seed for noise and disturbances. Same seed + same settings = identical run. Applied on Reset."
 	seed_title.mouse_filter = Control.MOUSE_FILTER_PASS
+	_hidden_when_compact.append(seed_title)
 	row.add_child(seed_title)
 
 	_seed_box = SpinBox.new()
@@ -104,7 +115,9 @@ func _init(plant_names: PackedStringArray, selected_plant: int) -> void:
 	_seed_box.tooltip_text = seed_title.tooltip_text
 	_seed_box.value_changed.connect(_on_seed_changed)
 	row.add_child(_seed_box)
-	row.add_child(VSeparator.new())
+	var seed_separator := VSeparator.new()
+	row.add_child(seed_separator)
+	_hidden_when_compact.append_array([_seed_box, seed_separator])
 
 	_time_label = Label.new()
 	_time_label.custom_minimum_size = Vector2(96.0, 0.0)
@@ -122,9 +135,30 @@ func _init(plant_names: PackedStringArray, selected_plant: int) -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 
+	_presenter_button = _make_button("Presenter", "Presenter mode (F2): bigger text, thicker lines, high contrast, fewer panels")
+	_presenter_button.toggle_mode = true
+	_presenter_button.pressed.connect(func() -> void: presenter_pressed.emit())
+	row.add_child(_presenter_button)
+
 	var fullscreen_button := _make_button("Fullscreen", "Toggle fullscreen")
 	fullscreen_button.pressed.connect(_on_fullscreen_pressed)
 	row.add_child(fullscreen_button)
+
+
+# Presenter mode: the button shows the state, and the toolbar drops the seed
+# and the "Time scale" title so it still fits at the bigger UI scale.
+func set_presenter(is_on: bool) -> void:
+	_presenter_button.set_pressed_no_signal(is_on)
+	# Highlighted while on. (Same text both ways: a longer label would make
+	# the toolbar too wide for presenter mode.)
+	if is_on:
+		_presenter_button.add_theme_color_override("font_color", SignalColors.SETPOINT)
+		_presenter_button.add_theme_color_override("font_pressed_color", SignalColors.SETPOINT)
+	else:
+		_presenter_button.remove_theme_color_override("font_color")
+		_presenter_button.remove_theme_color_override("font_pressed_color")
+	for control in _hidden_when_compact:
+		control.visible = not is_on
 
 
 func update_play_state(is_paused: bool) -> void:

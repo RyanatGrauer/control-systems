@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Scenario" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/scenario.gd" id="1_scenario"]
+[ext_resource type="Script" path="res://plants/hotend/hotend_plant.gd" id="2_plant"]
+
+[resource]
+script = ExtResource("1_scenario")
+title = "Hotend temperature"
+notes = "1. Manual first: heat the hotend to 200 °C and hold it. Notice that nothing happens for a moment after you change the power (dead time), and that it cools slowly.\n2. Switch to PID (P only). Where does it settle? Raise Kp until it starts to oscillate. The dead time is what limits you.\n3. Add Ki to remove the gap. Watch the overshoot after the long warm-up (integral windup).\n4. Advanced PID: try anti-windup \"clamping\". Compare the overshoot.\nTip: set Time scale to 4× to save waiting."
+start_mode = 0
+plant_script = ExtResource("2_plant")

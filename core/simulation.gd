@@ -78,6 +78,7 @@ var measurement: float = 0.0
 var command: float = 0.0
 var applied_input: float = 0.0
 var disturbance: float = 0.0
+var plant_input: float = 0.0        # what the ODE saw: applied input after dead time
 var controller_terms: Dictionary = {}  # latest P/I/D/FF contributions (may be empty)
 
 var _physics_dt: float = 1.0 / DEFAULT_PHYSICS_RATE_HZ
@@ -108,6 +109,7 @@ func reset() -> void:
 	step_count = 0
 	command = 0.0
 	applied_input = 0.0
+	plant_input = 0.0
 	disturbance = 0.0
 	controller_terms = {}
 	controller.reset()
@@ -146,7 +148,7 @@ func step_physics() -> void:
 	# 3. Integrate the plant ODE across one substep with the held input,
 	#    delayed by the plant's dead time if it has one.
 	_input_delay.push(applied_input)
-	var plant_input := applied_input
+	plant_input = applied_input
 	var dead_time := clampf(plant.get_input_dead_time(), 0.0, MAX_INPUT_DEAD_TIME_S)
 	if dead_time > 0.0:
 		plant_input = _input_delay.read(roundi(dead_time / _physics_dt))

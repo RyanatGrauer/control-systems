@@ -147,6 +147,10 @@ func _build_feedforward_section() -> void:
 	add_child(section)
 	var box := section.body
 	var definitions := _simulation.plant.get_feedforward_definitions()
+	# Start the sliders at the controller's values (a scenario may have set them).
+	var current := [_pid.static_gain, _pid.velocity_gain, _pid.acceleration_gain, _pid.gravity_gain]
+	for index in definitions.size():
+		definitions[index].default_value = current[index]
 	var setters: Array = [
 		func(v: float) -> void: _pid.static_gain = v,
 		func(v: float) -> void: _pid.velocity_gain = v,

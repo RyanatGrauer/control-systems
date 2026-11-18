@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Scenario" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/scenario.gd" id="1_scenario"]
+[ext_resource type="Script" path="res://plants/flywheel/flywheel_plant.gd" id="2_plant"]
+
+[resource]
+script = ExtResource("1_scenario")
+title = "Flywheel speed"
+notes = "1. Manual first: hold the wheel at 3000 RPM with the motor-voltage slider (or Up/Down). How steady can you keep it?\n2. Switch the controller to PID (P only). Raise Kp. Why does the speed always stop short of the target?\n3. Add a little Ki. What happens to the gap now? What happens if Ki is large?\n4. Set Ki back to 0 and open Feedforward: find the kV that reaches the target with no PID at all."
+start_mode = 0
+plant_script = ExtResource("2_plant")

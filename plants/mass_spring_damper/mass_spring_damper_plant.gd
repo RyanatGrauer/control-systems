@@ -112,6 +112,22 @@ func get_feedforward_definitions() -> Array[QuantityInfo]:
 	return make_feedforward_definitions(10.0, 20.0, 10.0, 50.0)
 
 
+func get_equation_text(state: PackedFloat64Array, plant_input: float,
+		disturbance: float) -> String:
+	var x := state[0]
+	var v := state[1]
+	var m := get_parameter("mass")
+	var k := get_parameter("stiffness")
+	var c := get_parameter("damping")
+	var acceleration := compute_derivative(state, plant_input, disturbance, 0.0)[1]
+	return "\n".join([
+		"m·dv/dt = F - k·x - c·v + F_dist,   dx/dt = v",
+		"%s·dv/dt = %s - %s·%s - %s·%s + %s" % [num(m), num(plant_input), num(k), num(x),
+			num(c), num(v), num(disturbance)],
+		"dv/dt = %s m/s²   (x = %s m, v = %s m/s)" % [num(acceleration), num(x), num(v)],
+	])
+
+
 func get_visual_scene_path() -> String:
 	return "res://plants/mass_spring_damper/mass_spring_damper_visual.tscn"
 

@@ -130,6 +130,26 @@ func get_feedforward_definitions() -> Array[QuantityInfo]:
 	return make_feedforward_definitions(input_max * 0.2, 1.0, 1.0, input_max)
 
 
+# The model written out for the Equations tab (README 7.4): the ODE in
+# symbols, then the same line with today's numbers substituted, then the
+# result. `plant_input` is what the ODE sees right now (after any dead time).
+# SI units throughout. The default lists the state and its derivative.
+func get_equation_text(state: PackedFloat64Array, plant_input: float,
+		disturbance: float) -> String:
+	var derivative := compute_derivative(state, plant_input, disturbance, 0.0)
+	var lines := PackedStringArray()
+	var definitions := get_state_definitions()
+	for index in state.size():
+		lines.append("%s = %s %s,  rate of change = %s" % [definitions[index].display_name,
+			num(state[index]), definitions[index].si_unit, num(derivative[index])])
+	return "\n".join(lines)
+
+
+# A number for equation text: 3 significant figures.
+static func num(value: float) -> String:
+	return NumberFormat.significant(value, 3)
+
+
 # res:// path of the scene that draws this plant.
 func get_visual_scene_path() -> String:
 	return ""

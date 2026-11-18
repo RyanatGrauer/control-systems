@@ -90,6 +90,22 @@ func find_first_index_at_or_after(time: float) -> int:
 	return low
 
 
+# A new recorder holding a copy of "time" plus `channels` (oldest first),
+# sized to fit exactly. Used to keep a finished run as a ghost trace.
+func copy_channels(channels: PackedStringArray) -> RunRecorder:
+	var names := PackedStringArray(["time"])
+	for channel_name in channels:
+		if channel_name != "time":
+			names.append(channel_name)
+	var copy := RunRecorder.new(names, maxi(_count, 2))
+	for index in _count:
+		var sample := {}
+		for channel_name in names:
+			sample[channel_name] = get_value(channel_name, index)
+		copy.record(sample)
+	return copy
+
+
 func _physical_index(logical_index: int) -> int:
 	# When the buffer is not yet full the oldest sample is in slot 0.
 	# Once full, the oldest sample is the one about to be overwritten next.

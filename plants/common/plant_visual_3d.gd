@@ -20,6 +20,7 @@ class_name PlantVisual3D
 extends Node3D
 
 const GRID_FLOOR_SHADER: Shader = preload("res://plants/common/grid_floor.gdshader")
+const GHOST_SHADER: Shader = preload("res://plants/common/ghost.gdshader")
 
 var camera: OrbitCamera
 
@@ -33,6 +34,13 @@ func show_state(_plant: Plant, _state: PackedFloat64Array, _setpoint: float,
 
 
 # Override if a visual needs to forget animation history on reset.
+# Called every frame with true while the actuator (or the PID's own output
+# limit) is clipping the command. Override to tint the part that shows the
+# input (e.g. turn the force arrow red). PlantView also shows a badge.
+func show_saturation(_saturated: bool) -> void:
+	pass
+
+
 func reset_visual() -> void:
 	pass
 
@@ -61,7 +69,7 @@ func build_studio(look_at_point: Vector3, distance: float, yaw_degrees: float,
 	var key_light := DirectionalLight3D.new()
 	key_light.rotation_degrees = Vector3(-50.0, 35.0, 0.0)
 	key_light.light_energy = 1.1
-	key_light.shadow_enabled = true
+	key_light.shadow_enabled = DisplaySettings.shadows  # off in the "Low" preset
 	add_child(key_light)
 
 	# Fill light from the other side, no shadows (cheap).
@@ -101,9 +109,21 @@ static func add_mesh(parent: Node3D, mesh: Mesh, color: Color,
 	return instance
 
 
-# Translucent material in the setpoint colour for a "ghost" copy of the plant
-# drawn at the target position (README 4.4). Unshaded so it reads as an overlay.
-static func make_ghost_material() -> StandardMaterial3D:
+# Material for the setpoint "ghost": a translucent copy of the plant drawn at
+# the target position (README 4.4). With DisplaySettings.animated_ghost it uses
+# ghost.gdshader (rim glow + pulse); otherwise a plain flat translucent colour
+# (the "Low" graphics preset).
+static func make_ghost_material() -> Material:
+	if DisplaySettings.animated_ghost:
+		var shader_material := ShaderMaterial.new()
+		shader_material.shader = GHOST_SHADER
+		shader_material.set_shader_parameter("ghost_color", Color(SignalColors.SETPOINT, 0.35))
+		return shader_material
+	return make_plain_ghost_material()
+
+
+# Flat translucent setpoint colour, unshaded so it reads as an overlay.
+static func make_plain_ghost_material() -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = Color(SignalColors.SETPOINT, 0.35)
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA

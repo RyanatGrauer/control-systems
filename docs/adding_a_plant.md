@@ -11,6 +11,7 @@ Use `plants/flywheel/` as the worked example.
    * `get_initial_state()`, `compute_derivative(state, applied_input, disturbance, time)` (return d(state)/dt), and `get_output(state)`.
    * Optional: `apply_constraints(state)` for hard stops, stick/slip, and similar effects. This runs between substeps. (For static friction, the elevator instead uses a Karnopp model inside `compute_derivative`.)
    * Optional: `get_input_dead_time()` (seconds) for a pure delay between actuator and plant (see the hotend). `output_is_rate()` returns true if the output is a speed (this changes what kV multiplies).
+   * `get_equation_text(state, plant_input, disturbance)`: the ODE in symbols, then with live numbers, for the Equations tab (see the flywheel).
    * `get_feedforward_definitions()`: return `make_feedforward_definitions(ks_max, kv_max, ka_max, kg_max)`. Defaults are 0. Note the ideal values in a comment.
    * `get_pid_gain_definitions()`: return `make_pid_gain_definitions(kp_default, kp_max, ki_default, ki_max, kd_default, kd_max)`. Start P-only (Ki = Kd = 0). Units are generated automatically.
    * `get_visual_scene_path()`

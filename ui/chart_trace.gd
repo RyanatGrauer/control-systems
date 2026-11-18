@@ -18,6 +18,7 @@ var width: float = 2.0       # pixels
 var dashed: bool = false     # dashed lines help when color is hard to see
 var display_scale: float = 1.0
 var visible: bool = true
+var ghost: bool = false      # also draw this channel for every ghost run
 
 
 func _init(new_channel: String, new_label: String, new_color: Color,

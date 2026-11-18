@@ -31,6 +31,13 @@ const P_TERM: Color = Color("#FF7F6E")         # coral
 const I_TERM: Color = Color("#5FD3B3")         # mint
 const D_TERM: Color = Color("#B39DFF")         # lavender
 const FF_TERM: Color = Color("#7FB8FF")        # light blue (feedforward)
+
+# Ghost runs (earlier runs drawn faded behind the live traces), oldest first.
+const GHOST_COLORS: Array[Color] = [
+	Color(0.85, 0.85, 0.85, 0.55),  # grey
+	Color(0.95, 0.70, 0.95, 0.55),  # pink
+	Color(0.70, 0.95, 0.75, 0.55),  # pale green
+]
 const TERM_SUM: Color = Color("#FFFFFF")       # white, drawn dashed
 
 # Plot furniture.

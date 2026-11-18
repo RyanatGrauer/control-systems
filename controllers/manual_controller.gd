@@ -30,3 +30,8 @@ func reset() -> void:
 # Bumpless transfer: keep sending whatever the previous controller sent.
 func take_over(previous_command: float, _setpoint: float, _measurement: float) -> void:
 	manual_command = previous_command
+
+
+func get_equation_text(_setpoint: float, _measurement: float) -> String:
+	return "u = your slider = %s\n(No equation: you are the controller.)" % \
+			NumberFormat.significant(manual_command, 3)
