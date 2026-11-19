@@ -18,6 +18,11 @@
 #   caption strip   "what's happening" text from Plant.get_description()
 #   scene area      the SubViewport with the 3D visual + "Reset camera" button
 #   bottom slot     the setpoint bar (added by main_screen.gd)
+#
+# SOUND (A/V patch)
+#   Plays the visual's looping sound with the pitch/loudness it asks for, and
+#   its one-shot sound_events. The loop fades out while simulated time stands
+#   still (paused, or scrubbing), so a paused classroom is quiet.
 class_name PlantView
 extends VBoxContainer
 
@@ -33,6 +38,16 @@ var _plant: Plant
 var _saturation_badge: Label
 var _is_orbiting: bool = false
 var _drag_distance: float = 0.0
+var _loop_player: AudioStreamPlayer
+var _event_player: AudioStreamPlayer
+var _loop_loudness: float = 0.0   # smoothed 0..1
+var _loop_pitch: float = 1.0      # smoothed
+var _last_sim_time: float = -1.0
+
+# TUNABLE: plant sound mix and smoothing.
+const LOOP_GAIN: float = 0.55        # loop loudness at full level (before master volume)
+const EVENT_GAIN: float = 0.9
+const SOUND_SMOOTHING_HZ: float = 8.0  # how fast loudness/pitch follow the plant
 
 
 func _init() -> void:
@@ -115,6 +130,8 @@ func load_plant_visual(plant: Plant) -> void:
 		push_error("Visual scene '%s' must use a PlantVisual3D script." % scene_path)
 		return
 	_viewport.add_child(_visual)
+	_visual.sound_event.connect(_on_sound_event)
+	_start_loop(_visual.get_sound_loop())
 
 
 func show_state(simulation: Simulation) -> void:
@@ -127,6 +144,56 @@ func show_state(simulation: Simulation) -> void:
 	var saturated := simulation.actuator.is_saturated or clipped
 	_saturation_badge.visible = saturated
 	_visual.show_saturation(saturated)
+	_update_sound(simulation)
+
+
+func _start_loop(stream: AudioStream) -> void:
+	if _loop_player == null:
+		_loop_player = AudioStreamPlayer.new()
+		add_child(_loop_player)
+		_event_player = AudioStreamPlayer.new()
+		_event_player.max_polyphony = 3
+		add_child(_event_player)
+	_loop_player.stop()
+	_loop_player.stream = stream
+	_loop_loudness = 0.0
+	_loop_player.volume_db = -80.0
+
+
+func _update_sound(simulation: Simulation) -> void:
+	if _loop_player == null or _loop_player.stream == null:
+		return
+	var sim_time := simulation.get_time()
+	var running := sim_time != _last_sim_time
+	_last_sim_time = sim_time
+	var level := _visual.get_sound_level(simulation.plant, simulation.state, simulation.applied_input)
+	var target_loudness := clampf(level.y, 0.0, 1.0) if running else 0.0
+	# (A zero delta happens when tests drive _process directly: assume 60 fps.)
+	var frame_delta := get_process_delta_time()
+	var blend := clampf((frame_delta if frame_delta > 0.0 else 1.0 / 60.0) * SOUND_SMOOTHING_HZ, 0.0, 1.0)
+	_loop_loudness = lerpf(_loop_loudness, target_loudness, blend)
+	_loop_pitch = lerpf(_loop_pitch, clampf(level.x, 0.25, 4.0), blend)
+	var gain := _loop_loudness * LOOP_GAIN * DisplaySettings.get_gain(true)
+	if gain < 0.002:
+		if _loop_player.playing:
+			_loop_player.stop()  # silent: free the voice
+		return
+	_loop_player.pitch_scale = _loop_pitch
+	_loop_player.volume_db = linear_to_db(gain)
+	if not _loop_player.playing:
+		_loop_player.play()
+
+
+func _on_sound_event(kind: StringName, strength: float) -> void:
+	var gain := strength * EVENT_GAIN * DisplaySettings.get_gain(true)
+	if gain < 0.002 or _event_player == null:
+		return
+	match kind:
+		&"hard_stop":
+			_event_player.stream = SoundBank.HARD_STOP
+	_event_player.volume_db = linear_to_db(gain)
+	_event_player.pitch_scale = randf_range(0.92, 1.08)  # not the sim's RNG: sound only
+	_event_player.play()
 
 
 # Re-apply DisplaySettings (Graphics panel). Rebuilds the 3D visual so lights
@@ -141,6 +208,7 @@ func apply_graphics() -> void:
 func reset_visual() -> void:
 	if _visual != null:
 		_visual.reset_visual()
+		_visual.reset_hard_stop_tracking()
 
 
 func _on_scene_input(event: InputEvent) -> void:

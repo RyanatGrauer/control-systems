@@ -37,6 +37,12 @@ grep -rn "TUNABLE" --include=*.gd --include=*.gdshader .
 | `core/lesson_checks.gd` | `OSCILLATION_WINDOW_S` (window the "oscillating" check looks at) |
 | `core/oscillation.gd` | `MIN_SWING_FRACTION` (smallest swing that counts as oscillating) |
 | `ui/main_screen.gd` (also) | `LESSON_CHECK_INTERVAL_S`, `ZN_UPDATE_INTERVAL_S`, `ZN_WINDOW_S` |
+| `plants/common/plant_visual_3d.gd` | Surface tiling per texture, normal strength, HDRI energy and ambient level, hard-stop minimum speed |
+| `ui/plant_view.gd` | Plant-loop and hard-stop loudness, pitch/loudness smoothing |
+| `ui/sound_fx.gd` | Click and chime loudness, how soon after a mouse press a button counts as user-clicked |
+| each `plants/*/*_visual.gd` | `SOUND_FULL_SPEED`: the speed that gives the highest pitch / loudest clunk |
+| `ui/display_settings.gd` | Default volume (0.6), which presets turn textures off |
+| `tools/make_synth_sounds.py` | Motor whine harmonics, hiss band, sample rate |
 | `core/mystery.gd` | `SPREAD` (mystery parameters lie between 1/SPREAD× and SPREAD× their default), `ZERO_DEFAULT_FRACTION` |
 | `core/zn_tuning.gd` | `STEADY_TOLERANCE`, `MIN_CYCLES` (when a swing counts as steady); the rule table `RULES` |
 | `ui/ui_style.gd` | Every text size (body, large readouts, hints, chart and diagram text), the smallest allowed size, hint colour, plot line-width scale |

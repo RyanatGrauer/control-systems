@@ -34,7 +34,7 @@ func _ready() -> void:
 	pad_mesh.top_radius = 0.4
 	pad_mesh.bottom_radius = 0.4
 	pad_mesh.height = 0.03
-	add_mesh(self, pad_mesh, Color(0.3, 0.32, 0.36), 0.3, 0.6).position = Vector3(0.0, 0.015, 0.0)
+	apply_surface(add_mesh(self, pad_mesh, Color(0.6, 0.62, 0.66), 0.0, 1.0), Surface.CONCRETE).position = Vector3(0.0, 0.015, 0.0)
 	_build_height_pole()
 
 	_drone = _build_drone(false)
@@ -68,6 +68,8 @@ func show_state(plant: Plant, state: PackedFloat64Array, setpoint: float,
 	_height_label.text = "%s m" % String.num(state[0], 2).pad_decimals(2)
 	_thrust_label.position.y = drone_y - 0.02
 	_thrust_label.text = "thrust %s N" % String.num(applied_input, 1).pad_decimals(1)
+	track_hard_stop(state[0] <= 0.0005 or state[0] >= DronePlant.CEILING - 0.0005,
+			state[1], SOUND_FULL_IMPACT_SPEED)
 
 
 func reset_visual() -> void:
@@ -130,3 +132,16 @@ func _build_height_pole() -> void:
 	ceiling_mesh.size = Vector3(1.2, 0.02, 0.5)
 	add_mesh(self, ceiling_mesh, Color(0.8, 0.2, 0.2, 0.6)).position = \
 			Vector3(0.0, BASE_Y + DronePlant.CEILING * METRES_TO_WORLD + 0.06, 0.0)
+
+
+# --- sound: rotor buzz rises with thrust; a clunk on landing / the ceiling ---
+const SOUND_FULL_IMPACT_SPEED: float = 3.0  # TUNABLE: m/s for the loudest clunk
+
+
+func get_sound_loop() -> AudioStream:
+	return SoundBank.PROPELLER_LOOP
+
+
+func get_sound_level(plant: Plant, _state: PackedFloat64Array, applied_input: float) -> Vector2:
+	var thrust := sqrt(clampf(applied_input / plant.get_input_definition().max_value, 0.0, 1.0))
+	return Vector2(0.6 + 0.8 * thrust, thrust)

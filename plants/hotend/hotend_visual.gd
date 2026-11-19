@@ -68,7 +68,7 @@ func show_state(plant: Plant, state: PackedFloat64Array, setpoint: float,
 func _build_hotend() -> void:
 	var base_mesh := BoxMesh.new()
 	base_mesh.size = Vector3(1.3, 0.06, 0.6)
-	add_mesh(self, base_mesh, Color(0.25, 0.27, 0.30), 0.3, 0.7).position = Vector3(0.05, 0.03, 0.0)
+	apply_surface(add_mesh(self, base_mesh, Color(0.55, 0.56, 0.58), 0.0, 1.0), Surface.CONCRETE).position = Vector3(0.05, 0.03, 0.0)
 
 	# Heat-break tube from above, holding the block in the air.
 	var tube_mesh := CylinderMesh.new()
@@ -136,3 +136,12 @@ func _build_thermometer() -> void:
 		label.text = "%d" % degrees
 	add_label(Vector3(THERMOMETER_X, THERMOMETER_BOTTOM + THERMOMETER_HEIGHT + 0.08, 0.0),
 			28, Color(0.80, 0.82, 0.86)).text = "°C"
+
+
+# --- sound: a soft hiss that grows with heater power ---
+func get_sound_loop() -> AudioStream:
+	return SoundBank.HEATER_HISS
+
+
+func get_sound_level(plant: Plant, _state: PackedFloat64Array, applied_input: float) -> Vector2:
+	return Vector2(1.0, 0.5 * clampf(applied_input / plant.get_input_definition().max_value, 0.0, 1.0))

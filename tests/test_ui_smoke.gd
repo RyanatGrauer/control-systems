@@ -262,6 +262,19 @@ func test_presenter_layout_fits() -> void:
 	screen.queue_free()
 
 
+# The normal (non-presenter) layout must fit the 1920x1080 design size too:
+# the toolbar is the widest row.
+func test_normal_layout_fits() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	var screen := MainScreenScene.instantiate()
+	tree.root.add_child(screen)
+	_run_frames(screen, 3)
+	var needed: Vector2 = screen._background.get_parent().get_child(1).get_combined_minimum_size()
+	check_true(needed.x <= 1920.0, "layout width %d fits 1920" % needed.x)
+	check_true(needed.y <= 1080.0, "layout height %d fits 1080" % needed.y)
+	screen.queue_free()
+
+
 func test_snapshots_are_saved_and_restored() -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	var screen := MainScreenScene.instantiate()

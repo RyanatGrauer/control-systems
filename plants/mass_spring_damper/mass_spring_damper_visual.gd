@@ -83,7 +83,7 @@ func show_state(plant: Plant, state: PackedFloat64Array, setpoint: float,
 func _build_wall() -> void:
 	var wall_mesh := BoxMesh.new()
 	wall_mesh.size = Vector3(0.1, 0.7, 0.6)
-	add_mesh(self, wall_mesh, Color(0.32, 0.34, 0.38), 0.1, 0.8).position = \
+	apply_surface(add_mesh(self, wall_mesh, Color(0.6, 0.62, 0.66), 0.0, 1.0), Surface.CONCRETE).position = \
 			Vector3(WALL_FACE_X - 0.05, 0.35, 0.0)
 
 	# Damper body (the cylinder fixed to the wall).
@@ -147,3 +147,16 @@ func _build_moving_parts() -> void:
 	_force_arrow = MeshBuilders.build_arrow(SignalColors.APPLIED_INPUT, 0.025, 0.06)
 	_force_arrow.position = Vector3(0.0, ARROW_HEIGHT, 0.0)
 	add_child(_force_arrow)
+
+
+# --- sound: the actuator motor whines with the force it pushes ---
+const SOUND_FULL_SPEED: float = 1.0  # TUNABLE: m/s for the highest pitch
+
+
+func get_sound_loop() -> AudioStream:
+	return SoundBank.MOTOR_WHINE
+
+
+func get_sound_level(plant: Plant, state: PackedFloat64Array, applied_input: float) -> Vector2:
+	var speed := clampf(absf(state[1]) / SOUND_FULL_SPEED, 0.0, 1.0)
+	return Vector2(0.8 + 0.6 * speed, clampf(0.7 * effort_fraction(plant, applied_input), 0.0, 1.0))

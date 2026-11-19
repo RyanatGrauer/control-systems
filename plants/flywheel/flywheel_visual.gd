@@ -74,7 +74,7 @@ func reset_visual() -> void:
 func _build_stand_and_motor() -> void:
 	var base_plate := BoxMesh.new()
 	base_plate.size = Vector3(1.1, 0.04, 0.7)
-	add_mesh(self, base_plate, Color(0.25, 0.27, 0.30), 0.3, 0.7).position = Vector3(-0.2, 0.02, 0.0)
+	apply_surface(add_mesh(self, base_plate, Color(0.55, 0.56, 0.58), 0.0, 1.0), Surface.CONCRETE).position = Vector3(-0.2, 0.02, 0.0)
 
 	var stand := BoxMesh.new()
 	stand.size = Vector3(0.34, 0.56, 0.3)
@@ -164,3 +164,17 @@ func _build_wheel() -> void:
 func _build_labels() -> void:
 	_speed_label = add_label(Vector3(WHEEL_CENTER.x, 1.48, 0.0), 80, SignalColors.MEASUREMENT)
 	_target_label = add_label(Vector3(WHEEL_CENTER.x, 1.34, 0.0), 48, SignalColors.SETPOINT)
+
+
+# --- sound: the motor whines higher as the wheel speeds up ---
+const SOUND_FULL_SPEED: float = 600.0  # TUNABLE: rad/s for the highest pitch
+
+
+func get_sound_loop() -> AudioStream:
+	return SoundBank.MOTOR_WHINE
+
+
+func get_sound_level(plant: Plant, state: PackedFloat64Array, applied_input: float) -> Vector2:
+	var speed := clampf(absf(state[0]) / SOUND_FULL_SPEED, 0.0, 1.0)
+	return Vector2(0.45 + 1.6 * speed,
+			clampf(1.4 * speed + 0.25 * effort_fraction(plant, applied_input), 0.0, 1.0))

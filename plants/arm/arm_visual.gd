@@ -76,6 +76,8 @@ func show_state(plant: Plant, state: PackedFloat64Array, setpoint: float,
 	_gravity_arrow.position = tip + Vector3(0.0, -0.08, 0.0)
 	_angle_label.text = "%s°" % String.num(rad_to_deg(angle), 1).pad_decimals(1)
 	_voltage_label.text = "motor %s V" % String.num(applied_input, 1).pad_decimals(1)
+	track_hard_stop(angle <= ArmPlant.MIN_ANGLE + 0.002 or angle >= ArmPlant.MAX_ANGLE - 0.002,
+			state[1], SOUND_FULL_SPEED)
 
 
 func _set_length(length: float) -> void:
@@ -90,7 +92,7 @@ func _set_length(length: float) -> void:
 func _build_stand() -> void:
 	var base_mesh := BoxMesh.new()
 	base_mesh.size = Vector3(0.6, 0.04, 0.4)
-	add_mesh(self, base_mesh, Color(0.25, 0.27, 0.30), 0.3, 0.7).position = Vector3(0.0, 0.02, 0.0)
+	apply_surface(add_mesh(self, base_mesh, Color(0.55, 0.56, 0.58), 0.0, 1.0), Surface.CONCRETE).position = Vector3(0.0, 0.02, 0.0)
 	var post_mesh := BoxMesh.new()
 	post_mesh.size = Vector3(0.08, PIVOT.y, 0.08)
 	add_mesh(self, post_mesh, Color(0.55, 0.57, 0.60), 0.6, 0.4).position = Vector3(0.0, PIVOT.y * 0.5, -0.04)
@@ -123,3 +125,17 @@ func _build_stand() -> void:
 	stop_mesh.size = Vector3(0.05, 0.05, 0.05)
 	add_mesh(self, stop_mesh, Color(0.8, 0.2, 0.2)).position = PIVOT + Vector3(0.07, -0.16, 0.08)
 	add_mesh(self, stop_mesh, Color(0.8, 0.2, 0.2)).position = PIVOT + Vector3(-0.16, -0.07, 0.08)
+
+
+# --- sound: motor whine, and a clunk on the hard stops ---
+const SOUND_FULL_SPEED: float = 4.0  # TUNABLE: rad/s for the highest pitch / loudest clunk
+
+
+func get_sound_loop() -> AudioStream:
+	return SoundBank.MOTOR_WHINE
+
+
+func get_sound_level(plant: Plant, state: PackedFloat64Array, applied_input: float) -> Vector2:
+	var speed := clampf(absf(state[1]) / SOUND_FULL_SPEED, 0.0, 1.0)
+	return Vector2(0.55 + 1.1 * speed,
+			clampf(1.3 * speed + 0.35 * effort_fraction(plant, applied_input), 0.0, 1.0))

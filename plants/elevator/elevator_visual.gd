@@ -70,6 +70,8 @@ func show_state(plant: Plant, state: PackedFloat64Array, setpoint: float,
 	_height_label.position.y = carriage_y
 	_height_label.text = "%s cm" % String.num(output_info.si_to_shown(height), 1).pad_decimals(1)
 	_voltage_label.text = "motor %s V" % String.num(applied_input, 1).pad_decimals(1)
+	track_hard_stop(height <= 0.0005 or height >= ElevatorPlant.RAIL_HEIGHT - 0.0005,
+			state[1], SOUND_FULL_SPEED)
 
 
 func reset_visual() -> void:
@@ -80,7 +82,7 @@ func reset_visual() -> void:
 func _build_frame() -> void:
 	var base_mesh := BoxMesh.new()
 	base_mesh.size = Vector3(1.0, 0.04, 0.5)
-	add_mesh(self, base_mesh, Color(0.25, 0.27, 0.30), 0.3, 0.7).position = Vector3(0.0, -0.02, 0.0)
+	apply_surface(add_mesh(self, base_mesh, Color(0.55, 0.56, 0.58), 0.0, 1.0), Surface.CONCRETE).position = Vector3(0.0, -0.02, 0.0)
 
 	var rail_mesh := BoxMesh.new()
 	rail_mesh.size = Vector3(0.04, TOP_Y, 0.04)
@@ -131,3 +133,17 @@ func _build_frame() -> void:
 					Color(0.80, 0.82, 0.86)).text = "%d" % roundi(height * 100.0)
 	add_label(Vector3(RAIL_SPACING * 0.5 + 0.2, BASE_Y + ElevatorPlant.RAIL_HEIGHT + 0.12, 0.0),
 			28, Color(0.80, 0.82, 0.86)).text = "cm"
+
+
+# --- sound: the winch hums while it works, the carriage clunks on the stops ---
+const SOUND_FULL_SPEED: float = 0.8  # TUNABLE: m/s for the highest pitch / loudest clunk
+
+
+func get_sound_loop() -> AudioStream:
+	return SoundBank.WINCH_LOOP
+
+
+func get_sound_level(plant: Plant, state: PackedFloat64Array, applied_input: float) -> Vector2:
+	var speed := clampf(absf(state[1]) / SOUND_FULL_SPEED, 0.0, 1.0)
+	return Vector2(0.7 + 0.8 * speed,
+			clampf(1.2 * speed + 0.45 * effort_fraction(plant, applied_input), 0.0, 1.0))

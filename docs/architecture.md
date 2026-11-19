@@ -24,6 +24,9 @@ core/challenge*.gd          challenge data, grader, result, headless runner
 core/lesson*.gd, core/oscillation.gd   guided-lesson data, step checks, oscillation measurement
 core/zn_tuning.gd           Ziegler–Nichols / Tyreus–Luyben rules and swing judgement
 core/mystery.gd             mystery-plant parameter randomizer
+core/sound_bank.gd          every sound file the app loads (one place, to check against CREDITS.md)
+assets/          downloaded CC0 audio, textures and the studio HDRI; all listed in CREDITS.md
+tools/           make_synth_sounds.py (generates the two synthesized plant loops; not exported)
 controllers/     Controller base class, ManualController, PidController, CascadeController
 signal_blocks/   SetpointGenerator (constant/step/square/ramp/sine), TrapezoidalProfile,
                  Sensor (noise/quantization/delay/low-pass), Actuator (deadband/saturation/slew),
@@ -141,6 +144,26 @@ The bottom area has the output chart on the left and tabs on the right: Command,
 **Tuning slots A–D** (side panel › Snapshots): **Save** stores `PidController.get_tuning()`, which is every PID setting (gains, switches, feedforward), built from the script's variable list so new settings are included automatically. **Load + rerun** applies a slot's tuning, switches to PID, rebuilds the PID panel, and restarts from t = 0 with the same seed. Slots are kept per scenario for the session; saving them to disk is stage 19.
 
 **Ghost runs**: every Reset (and every Load) turns the run that is ending (if it lasted ≥ 1 s) into a `GhostRun`, a trimmed copy of its recorder. The newest 3 are drawn faded behind the live lines, for traces marked `ghost = true` (Measured, Applied). A ghost is labelled with a slot letter only if the whole run used that slot's exact tuning in PID mode; otherwise it is "run N". Ghosts are cleared when the scenario changes, because a different plant isn't comparable. Plot options: **Ghosts** on/off and **Clear ghosts**.
+
+## Sound and materials (A/V patch, after Milestone E)
+
+The teacher approved CC0 downloads for this patch. Every file in `assets/` is listed in **CREDITS.md** and in the in-app Credits dialog (`ui/credits.gd`); `test_every_asset_is_credited` fails if one is missing.
+
+* **Settings:** `DisplaySettings` holds `sound_on`, `sound_volume`, `plant_sounds`, `interface_sounds` and `detailed_materials`. They are saved with the other display settings, and older saves get the defaults. `get_gain(is_plant_sound)` gives the final loudness. Mute: the toolbar's Sound button (hidden in presenter mode, to fit) or the `sound_mute_toggle` action (M).
+* **Plant sounds:**
+  * Each PlantVisual3D can return a loop (`get_sound_loop()`) and, every frame, its pitch and loudness (`get_sound_level()`).
+  * PlantView plays the loop, smooths the pitch and loudness, and fades it out while simulated time stands still (paused).
+  * Hard stops: `track_hard_stop()` emits `sound_event(&"hard_stop", strength)` when a part arrives at a stop fast enough. It is used by the arm, elevator and drone.
+* **Interface sounds:** one `SoundFx` node (ui/sound_fx.gd) hooks every BaseButton and TabBar as it enters the tree.
+  * It only clicks within 400 ms of a real mouse or touch event, so code that sets a checkbox stays silent.
+  * Chimes: `SoundFx.play(SoundBank.SUCCESS)`, used for a passed challenge and a finished lesson step.
+  * A control can opt out with `set_meta("silent", true)`.
+* **Materials:** with `detailed_materials` on (off in the Low preset):
+  * `build_studio()` lights the scene from a studio HDRI (ambient light and reflections only; the background stays plain).
+  * `add_mesh()` gives every metallic part brushed metal.
+  * `apply_surface()` adds concrete, asphalt or grass, mapped triplanar.
+  * The cruise road uses UVs tied to road distance, so its texture scrolls with the road.
+* **Web:** textures are imported "Lossy" (WebP), which keeps the .pck at about 3 MB. Audio uses Godot's Web sample playback, and pitch and volume changes work there.
 
 ## Mystery mode (stage 24, README §5)
 

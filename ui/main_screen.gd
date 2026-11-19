@@ -120,6 +120,7 @@ func _ready() -> void:
 	_save_message = _save_store.load_from_disk()
 	DisplaySettings.load_save(_save_store.data["settings"])
 	WebPlatform.request_persistent_storage()
+	add_child(SoundFx.new())  # interface sounds for every button (A/V patch)
 	_load_scenario(_find_scenario(_save_store.data["settings"]["last_scenario"]),
 			Simulation.DEFAULT_SEED, 1.0)
 
@@ -167,6 +168,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_setpoint_bar.flip()
 	elif event.is_action_pressed("presenter_toggle"):
 		_toggle_presenter()
+	elif event.is_action_pressed("sound_mute_toggle"):
+		_toggle_sound()
 	elif not _handle_gain_shortcut(event):
 		return
 	get_viewport().set_input_as_handled()
@@ -440,6 +443,18 @@ func _on_display_settings_changed() -> void:
 	_save_display_settings()
 
 
+# Sound-only changes (volume, mute, categories): no need to rebuild the 3D view.
+func _on_sound_settings_changed() -> void:
+	_toolbar.show_sound(DisplaySettings.sound_on)
+	_save_display_settings()
+
+
+func _toggle_sound() -> void:
+	DisplaySettings.sound_on = not DisplaySettings.sound_on
+	_display_panel.sync_from_settings()
+	_on_sound_settings_changed()
+
+
 # --- Saving (stage 19, README 7.10) ---
 
 func _find_scenario(title: String) -> int:
@@ -525,6 +540,7 @@ func _update_challenge_test() -> void:
 	var result := ChallengeGrader.grade(_current_challenge(), _simulation.recorder,
 			_simulation.plant)
 	_challenge_panel.show_result(result)
+	SoundFx.play(SoundBank.SUCCESS if result.get_passed_count() == result.rows.size() else SoundBank.FAIL)
 	_record_challenge_result(result)
 	_challenge_panel.show_best(_get_challenge_record())
 	_end_test_lock()
@@ -674,6 +690,8 @@ func _update_lesson(delta: float) -> void:
 	var waiting_for := LessonChecks.evaluate(step, _simulation, _pid_controller, is_pid,
 			run_is_clean)
 	_lesson_step_done = waiting_for == ""
+	if _lesson_step_done and step.check != "":
+		SoundFx.play(SoundBank.STEP_DONE)
 	_lesson_panel.show_status(waiting_for, step.check != "")
 
 
@@ -924,6 +942,8 @@ func _build_layout() -> void:
 	_toolbar.time_scale_changed.connect(_clock.set_time_scale)
 	_toolbar.scenario_selected.connect(_on_scenario_selected)
 	_toolbar.presenter_pressed.connect(_toggle_presenter)
+	_toolbar.sound_pressed.connect(_toggle_sound)
+	_toolbar.show_sound(DisplaySettings.sound_on)
 	page.add_child(_toolbar)
 
 	# Top half (plant + side panel) and bottom half (plots), resizable.
@@ -1063,6 +1083,7 @@ func _build_side_panel() -> Control:
 	display_section.body.add_child(_display_panel)
 	_display_panel.setup()
 	_display_panel.settings_changed.connect(_on_display_settings_changed)
+	_display_panel.sound_settings_changed.connect(_on_sound_settings_changed)
 	_display_panel.presenter_toggled.connect(_set_presenter)
 
 	# --- Save & export (stage 19) ---

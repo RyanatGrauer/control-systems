@@ -11,6 +11,8 @@
 #   by StripChart / BlockDiagram (line widths, contrast). The Display panel
 #   writes them and then asks main_screen.gd to re-apply them. Saved with the
 #   other settings by SaveStore (to_save / load_save).
+#   Sound settings live here too (stage A/V patch): one place for "how the
+#   app looks and sounds", saved the same way.
 class_name DisplaySettings
 extends RefCounted
 
@@ -22,7 +24,14 @@ static var shadows: bool = true                     # the key light's shadow
 static var render_scale: float = 1.0                # 3D resolution (0.5-1.0)
 static var motion_blur: bool = true                 # flywheel blur disc
 static var animated_ghost: bool = true              # rim glow + gentle pulse on setpoint ghosts
+static var detailed_materials: bool = true          # textures + studio reflections (CREDITS.md)
 static var preset: Preset = Preset.MEDIUM
+
+# --- sound (not part of the graphics presets) ---
+static var sound_on: bool = true          # master mute (toolbar button, M key)
+static var sound_volume: float = 0.6      # master volume, 0..1
+static var plant_sounds: bool = true      # motor / engine / rotor loops, hard-stop clunks
+static var interface_sounds: bool = true  # button clicks, challenge / lesson chimes
 
 # --- presenter mode ---
 static var presenter: bool = false
@@ -43,18 +52,21 @@ static func apply_preset(new_preset: Preset) -> void:
 			render_scale = 0.75
 			motion_blur = false
 			animated_ghost = false
+			detailed_materials = false
 		Preset.MEDIUM:
 			msaa = Viewport.MSAA_2X
 			shadows = true
 			render_scale = 1.0
 			motion_blur = true
 			animated_ghost = true
+			detailed_materials = true
 		Preset.HIGH:
 			msaa = Viewport.MSAA_4X
 			shadows = true
 			render_scale = 1.0
 			motion_blur = true
 			animated_ghost = true
+			detailed_materials = true
 
 
 static func get_preset_name(which: Preset) -> String:
@@ -77,13 +89,18 @@ static func plot_grid() -> Color:
 
 static func default_save() -> Dictionary:
 	return {"graphics_preset": Preset.MEDIUM, "msaa": Viewport.MSAA_2X, "shadows": true,
-		"render_scale": 1.0, "motion_blur": true, "animated_ghost": true, "presenter": false}
+		"render_scale": 1.0, "motion_blur": true, "animated_ghost": true, "presenter": false,
+		"detailed_materials": true, "sound_on": true, "sound_volume": 0.6, "plant_sounds": true,
+		"interface_sounds": true}
 
 
 static func to_save() -> Dictionary:
 	return {"graphics_preset": preset, "msaa": msaa, "shadows": shadows,
 		"render_scale": render_scale, "motion_blur": motion_blur,
-		"animated_ghost": animated_ghost, "presenter": presenter}
+		"animated_ghost": animated_ghost, "presenter": presenter,
+		"detailed_materials": detailed_materials, "sound_on": sound_on,
+		"sound_volume": sound_volume, "plant_sounds": plant_sounds,
+		"interface_sounds": interface_sounds}
 
 
 # `settings` has already been validated (right keys and types).
@@ -95,4 +112,18 @@ static func load_save(settings: Dictionary) -> void:
 	motion_blur = settings["motion_blur"]
 	animated_ghost = settings["animated_ghost"]
 	presenter = settings["presenter"]
+	detailed_materials = settings["detailed_materials"]
+	sound_on = settings["sound_on"]
+	sound_volume = clampf(settings["sound_volume"], 0.0, 1.0)
+	plant_sounds = settings["plant_sounds"]
+	interface_sounds = settings["interface_sounds"]
+
+
+# Final loudness (0..1) for a sound of one category, after mute and volume.
+static func get_gain(is_plant_sound: bool) -> float:
+	if not sound_on:
+		return 0.0
+	if not (plant_sounds if is_plant_sound else interface_sounds):
+		return 0.0
+	return sound_volume
 

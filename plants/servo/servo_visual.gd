@@ -40,7 +40,7 @@ func show_state(plant: Plant, state: PackedFloat64Array, setpoint: float,
 func _build_housing_and_dial() -> void:
 	var base_mesh := BoxMesh.new()
 	base_mesh.size = Vector3(1.0, 0.06, 0.6)
-	add_mesh(self, base_mesh, Color(0.25, 0.27, 0.30), 0.3, 0.7).position = Vector3(0.0, 0.03, 0.0)
+	apply_surface(add_mesh(self, base_mesh, Color(0.55, 0.56, 0.58), 0.0, 1.0), Surface.CONCRETE).position = Vector3(0.0, 0.03, 0.0)
 
 	var housing_mesh := BoxMesh.new()
 	housing_mesh.size = Vector3(0.86, 0.86, 0.26)
@@ -96,3 +96,17 @@ func _build_arm(color: Color, material_override: Material, z_offset: float) -> N
 		var hub := add_mesh(pivot, hub_mesh, Color(0.15, 0.15, 0.17), 0.6, 0.4)
 		hub.rotation_degrees = Vector3(90.0, 0.0, 0.0)
 	return pivot
+
+
+# --- sound: motor whine while the arm moves or the motor strains ---
+const SOUND_FULL_SPEED: float = 15.0  # TUNABLE: rad/s for the highest pitch
+
+
+func get_sound_loop() -> AudioStream:
+	return SoundBank.MOTOR_WHINE
+
+
+func get_sound_level(plant: Plant, state: PackedFloat64Array, applied_input: float) -> Vector2:
+	var speed := clampf(absf(state[1]) / SOUND_FULL_SPEED, 0.0, 1.0)
+	return Vector2(0.6 + 1.2 * speed,
+			clampf(1.5 * speed + 0.3 * effort_fraction(plant, applied_input), 0.0, 1.0))

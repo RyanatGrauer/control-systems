@@ -20,12 +20,14 @@ signal time_scale_changed(new_scale: float)
 signal seed_changed(new_seed: int)
 signal scenario_selected(index: int)
 signal presenter_pressed
+signal sound_pressed
 
 # TUNABLE: how long the "slower than real time" warning stays visible after
 # the last slow frame, so it does not flicker.
 const SLOW_WARNING_HOLD_S: float = 1.0
 
 var _presenter_button: Button
+var _sound_button: Button
 var _hidden_when_compact: Array[Control] = []  # presenter mode drops these to fit
 var _play_button: Button
 var _time_scale_slider: HSlider
@@ -38,7 +40,7 @@ var _slow_warning_timer: float = 0.0
 
 func _init(scenario_titles: PackedStringArray, selected_scenario: int) -> void:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 15)
+	row.add_theme_constant_override("separation", 12)  # TUNABLE: the toolbar must fit 1920 px
 	add_child(row)
 
 	var scenario_menu := OptionButton.new()
@@ -50,7 +52,7 @@ func _init(scenario_titles: PackedStringArray, selected_scenario: int) -> void:
 	# Fixed width (long titles are clipped) so the toolbar fits presenter mode.
 	scenario_menu.fit_to_longest_item = false
 	scenario_menu.clip_text = true
-	scenario_menu.custom_minimum_size = Vector2(340.0, 0.0)  # TUNABLE
+	scenario_menu.custom_minimum_size = Vector2(310.0, 0.0)  # TUNABLE
 	# The popup's index_pressed fires even when the CURRENT scenario is chosen
 	# again, so re-choosing it reloads it (restoring all its settings).
 	# (OptionButton.item_selected only fires on a change.)
@@ -85,7 +87,7 @@ func _init(scenario_titles: PackedStringArray, selected_scenario: int) -> void:
 	_time_scale_slider.max_value = 1.0
 	_time_scale_slider.step = 0.01
 	_time_scale_slider.value = 0.0
-	_time_scale_slider.custom_minimum_size = Vector2(150.0, 0.0)
+	_time_scale_slider.custom_minimum_size = Vector2(110.0, 0.0)
 	_time_scale_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_time_scale_slider.focus_mode = Control.FOCUS_NONE
 	_time_scale_slider.tooltip_text = "Slow motion or fast forward. Double-click the label to reset."
@@ -135,6 +137,13 @@ func _init(scenario_titles: PackedStringArray, selected_scenario: int) -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 
+	_sound_button = _make_button("Sound", "Mute or unmute all sounds (M). Volume and details: Display & graphics.")
+	_sound_button.custom_minimum_size = Vector2(96.0, 0.0)  # same width both ways
+	_sound_button.set_meta("silent", true)  # it would click while muting itself
+	_sound_button.pressed.connect(sound_pressed.emit)
+	row.add_child(_sound_button)
+	_hidden_when_compact.append(_sound_button)  # presenter mode: too wide; M still works
+
 	_presenter_button = _make_button("Presenter", "Presenter mode (F2): bigger text, thicker lines, high contrast, fewer panels")
 	_presenter_button.toggle_mode = true
 	_presenter_button.pressed.connect(func() -> void: presenter_pressed.emit())
@@ -145,8 +154,9 @@ func _init(scenario_titles: PackedStringArray, selected_scenario: int) -> void:
 	row.add_child(fullscreen_button)
 
 
-# Presenter mode: the button shows the state, and the toolbar drops the seed
-# and the "Time scale" title so it still fits at the bigger UI scale.
+# Presenter mode: the button shows the state, and the toolbar drops the seed,
+# the Sound button and the "Time scale" title so it still fits at the bigger
+# UI scale.
 func set_presenter(is_on: bool) -> void:
 	_presenter_button.set_pressed_no_signal(is_on)
 	# Highlighted while on. (Same text both ways: a longer label would make
@@ -159,6 +169,14 @@ func set_presenter(is_on: bool) -> void:
 		_presenter_button.remove_theme_color_override("font_pressed_color")
 	for control in _hidden_when_compact:
 		control.visible = not is_on
+
+
+func show_sound(is_on: bool) -> void:
+	_sound_button.text = "Sound" if is_on else "Muted"
+	if is_on:
+		_sound_button.remove_theme_color_override("font_color")
+	else:
+		_sound_button.add_theme_color_override("font_color", SignalColors.WARNING_TEXT)
 
 
 func update_play_state(is_paused: bool) -> void:
