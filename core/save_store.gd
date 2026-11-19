@@ -22,7 +22,8 @@
 #   { "schema_version": 1,
 #     "settings":  { see DisplaySettings.to_save() + "last_scenario" },
 #     "snapshots": { scenario title: { "A".."D": { PID variable: number/bool } } },
-#     "challenges": {}, "lessons": {} }   <- reserved for Milestone E
+#     "challenges": { scenario title: {"best_score", "best_iae", "completed"} },
+#     "lessons": { scenario title: {"step": index, "finished": bool, "completed": bool} } }
 class_name SaveStore
 extends RefCounted
 
@@ -160,7 +161,31 @@ static func validate(raw: Dictionary) -> Dictionary:
 					clean_slots[slot] = clean_tuning(slots[slot])
 			if not clean_slots.is_empty():
 				clean["snapshots"][title] = clean_slots
+	var raw_challenges: Variant = raw.get("challenges")
+	if raw_challenges is Dictionary:
+		for title: Variant in raw_challenges:
+			var record: Variant = raw_challenges[title]
+			if title is String and record is Dictionary:
+				clean["challenges"][title] = clean_challenge_record(record)
+	var raw_lessons: Variant = raw.get("lessons")
+	if raw_lessons is Dictionary:
+		for title: Variant in raw_lessons:
+			var record: Variant = raw_lessons[title]
+			if title is String and record is Dictionary:
+				clean["lessons"][title] = {
+					"step": maxi(_same_type(record.get("step"), 0), 0),
+					"finished": _same_type(record.get("finished"), false),
+					"completed": _same_type(record.get("completed"), false)}
 	return clean
+
+
+# One challenge's best result: {"best_score": 0-100, "best_iae": >= 0, "completed": bool}.
+static func clean_challenge_record(raw: Dictionary) -> Dictionary:
+	return {
+		"best_score": clampi(_same_type(raw.get("best_score"), 0), 0, 100),
+		"best_iae": maxf(_same_type(raw.get("best_iae"), 1e30), 0.0),
+		"completed": _same_type(raw.get("completed"), false),
+	}
 
 
 # A PID tuning with only real PidController variables, each converted to the

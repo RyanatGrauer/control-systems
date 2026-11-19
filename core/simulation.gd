@@ -42,6 +42,7 @@ const RECORDED_CHANNELS: PackedStringArray = [
 	"time", "setpoint", "measurement", "true_output", "error",
 	"command", "applied_input", "disturbance",
 	"p_term", "i_term", "d_term", "ff_term", "controller_sum",
+	"inner_setpoint", "inner_measurement",  # cascaded PID only (stage 23), else 0
 ]
 
 # TUNABLE: defaults for a new run.
@@ -137,6 +138,11 @@ func step_physics() -> void:
 		var controller_dt := _controller_period_steps * _physics_dt
 		_update_setpoint(time)
 		measurement = sensor.measure(plant.get_output(state), time, rng, controller_dt)
+		var cascade := controller as CascadeController
+		if cascade != null:
+			# The inner sensor (e.g. a velocity estimate) is ideal: the
+			# sensor panel's noise/delay apply to the main measurement.
+			cascade.inner_measurement = plant.get_inner_output(state)
 		command = controller.compute(setpoint, measurement, controller_dt)
 		controller_terms = controller.get_term_contributions()
 		applied_input = actuator.apply(command, controller_dt)
@@ -261,4 +267,7 @@ func _record_sample(time: float) -> void:
 		"d_term": controller_terms.get("d", 0.0),
 		"ff_term": controller_terms.get("ff", 0.0),
 		"controller_sum": controller_terms.get("sum", command),
+		"inner_setpoint": (controller as CascadeController).inner_setpoint \
+				if controller is CascadeController else 0.0,
+		"inner_measurement": plant.get_inner_output(state),
 	})

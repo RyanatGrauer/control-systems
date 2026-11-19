@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Scenario" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/scenario.gd" id="1_scenario"]
+[ext_resource type="Script" path="res://plants/arm/arm_plant.gd" id="2_plant"]
+
+[resource]
+script = ExtResource("1_scenario")
+title = "Rotating arm"
+notes = "1. Manual first: lift the arm to level (0°) and hold it. Notice the voltage you need there, then try holding it at 60°.\n2. Switch to PID (P only). It sags below the target: that's gravity. The sag is worst when the arm is level.\n3. Open Feedforward, turn on kG with \"× cos(angle)\" and find the kG that holds it level with no error. Now try other targets: one kG works everywhere.\n4. Tune a P-only loop for 0°, then set the target to 80°. Is it still well tuned? Gravity changes how the arm responds.\n5. Try Cascaded PID: an angle loop that asks a speed loop for a swing rate."
+start_mode = 0
+plant_script = ExtResource("2_plant")

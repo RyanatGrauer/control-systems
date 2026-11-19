@@ -122,8 +122,9 @@ func show_state(simulation: Simulation) -> void:
 		return
 	_visual.show_state(simulation.plant, simulation.state, simulation.setpoint,
 			simulation.applied_input, simulation.get_time())
-	var pid := simulation.controller as PidController
-	var saturated := simulation.actuator.is_saturated or (pid != null and pid.is_output_clipped())
+	var controller := simulation.controller
+	var clipped: bool = controller.has_method("is_output_clipped") and controller.call("is_output_clipped")
+	var saturated := simulation.actuator.is_saturated or clipped
 	_saturation_badge.visible = saturated
 	_visual.show_saturation(saturated)
 

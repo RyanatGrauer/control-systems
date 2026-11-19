@@ -130,6 +130,38 @@ func get_feedforward_definitions() -> Array[QuantityInfo]:
 	return make_feedforward_definitions(input_max * 0.2, 1.0, 1.0, input_max)
 
 
+# Mystery mode (stage 24) randomizes every parameter except these keys,
+# e.g. ones that would make the plant unusable when changed.
+func get_mystery_fixed_keys() -> Array[String]:
+	return []
+
+
+# --- Cascaded PID (stage 23) ---
+# Plants that support a cascade expose an INNER measured quantity, usually
+# the output's rate (height -> vertical speed). The outer PID turns the
+# output error into an inner setpoint; the inner PID turns the inner error
+# into the input. null = this plant has no inner loop (no "Cascaded PID").
+func get_inner_definition() -> QuantityInfo:
+	return null
+
+
+func get_inner_output(_state: PackedFloat64Array) -> float:
+	return 0.0
+
+
+# [outer gains, inner gains], each [Kp, Ki, Kd] as QuantityInfo. Use
+# make_cascade_gain_definitions().
+func get_cascade_gain_definitions() -> Array:
+	return []
+
+
+# Largest inner setpoint the outer loop may ask for (e.g. max climb speed);
+# the outer PID's output limits are ± this.
+func get_inner_setpoint_limit() -> float:
+	var inner := get_inner_definition()
+	return inner.max_value if inner != null else 0.0
+
+
 # The model written out for the Equations tab (README 7.4): the ODE in
 # symbols, then the same line with today's numbers substituted, then the
 # result. `plant_input` is what the ODE sees right now (after any dead time).
@@ -176,6 +208,31 @@ func make_pid_gain_definitions(kp_default: float, kp_max: float,
 		QuantityInfo.new("kd", "Kd (derivative)", "%s·s/%s" % [input_unit, output_unit]) \
 			.with_range(0.0, kd_max, kd_default).with_log_slider(kd_max * 1e-4) \
 			.with_description("Pushes against fast changes in the error, like a brake. Reduces overshoot; amplifies noise."),
+	]
+
+
+# Outer and inner PID gain definitions for a cascade, with correct units:
+# outer gains are inner-units per output-unit, inner gains are input-units
+# per inner-unit. Each array is [kp_default, kp_max, ki_default, ki_max,
+# kd_default, kd_max].
+func make_cascade_gain_definitions(outer: Array, inner: Array) -> Array:
+	var inner_info := get_inner_definition()
+	return [
+		_make_gain_trio(inner_info.si_unit, get_output_definition().si_unit, outer, "Outer "),
+		_make_gain_trio(get_input_definition().si_unit, inner_info.si_unit, inner, "Inner "),
+	]
+
+
+func _make_gain_trio(input_unit: String, output_unit: String, values: Array,
+		prefix: String) -> Array[QuantityInfo]:
+	var wrapped := _wrap_unit(output_unit)
+	return [
+		QuantityInfo.new("kp", prefix + "Kp", "%s/%s" % [input_unit, wrapped]) \
+			.with_range(0.0, values[1], values[0]).with_log_slider(values[1] * 1e-4),
+		QuantityInfo.new("ki", prefix + "Ki", "%s/(%s·s)" % [input_unit, wrapped]) \
+			.with_range(0.0, values[3], values[2]).with_log_slider(values[3] * 1e-4),
+		QuantityInfo.new("kd", prefix + "Kd", "%s·s/%s" % [input_unit, wrapped]) \
+			.with_range(0.0, values[5], values[4]).with_log_slider(values[5] * 1e-4),
 	]
 
 

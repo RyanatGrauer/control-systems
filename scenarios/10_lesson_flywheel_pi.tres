@@ -1,0 +1,70 @@
+[gd_resource type="Resource" script_class="Scenario" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://core/scenario.gd" id="1_scenario"]
+[ext_resource type="Script" path="res://plants/flywheel/flywheel_plant.gd" id="2_plant"]
+[ext_resource type="Script" path="res://core/lesson.gd" id="3_lesson"]
+[ext_resource type="Script" path="res://core/lesson_step.gd" id="4_step"]
+
+[sub_resource type="Resource" id="Step_1"]
+script = ExtResource("4_step")
+prompt = "You are the controller first. Drag the motor voltage slider (or hold Up/Down) to bring the wheel to 3000 RPM and hold it there. Press Next when you have felt how hard that is."
+check = ""
+check_value = 0.0
+unlock_controls = Array[String]([])
+
+[sub_resource type="Resource" id="Step_2"]
+script = ExtResource("4_step")
+prompt = "Now let a controller do the work. Switch the controller menu (top of the right panel) from Manual to PID."
+check = "mode_pid"
+check_value = 0.0
+unlock_controls = Array[String](["controller_mode"])
+
+[sub_resource type="Resource" id="Step_3"]
+script = ExtResource("4_step")
+prompt = "P control: motor voltage = Kp × error. Raise Kp until the speed gets close to 3000 RPM. Press Reset (R) to watch it start from zero with your new Kp."
+check = "kp_at_least"
+check_value = 0.3
+unlock_controls = Array[String]([])
+
+[sub_resource type="Resource" id="Step_4"]
+script = ExtResource("4_step")
+prompt = "Look closely at the plot: P alone always stops a little short of 3000 RPM. That gap is the steady-state error. Why can't P close it? (Hint: what is Kp × error when the error is zero?)"
+check = ""
+check_value = 0.0
+unlock_controls = Array[String]([])
+
+[sub_resource type="Resource" id="Step_5"]
+script = ExtResource("4_step")
+prompt = "Ki is unlocked. The I term adds up the error over time, so it keeps pushing until the gap is gone. Add some Ki and press Reset. Get within 10 RPM of the target."
+check = "steady_state_error_at_most"
+check_value = 1.0472
+unlock_controls = Array[String](["ki"])
+
+[sub_resource type="Resource" id="Step_6"]
+script = ExtResource("4_step")
+prompt = "Now make Ki much bigger and press Reset. What happens just after the start?"
+check = "overshoot_at_least"
+check_value = 20.0
+unlock_controls = Array[String]([])
+
+[sub_resource type="Resource" id="Step_7"]
+script = ExtResource("4_step")
+prompt = "Too much I overshoots; too little is slow. Find a Ki that overshoots less than 10%. Watch how slowly a small Ki closes the gap: that is the trade-off."
+check = "overshoot_at_most"
+check_value = 10.0
+unlock_controls = Array[String]([])
+
+[sub_resource type="Resource" id="Resource_lesson"]
+script = ExtResource("3_lesson")
+hidden_controls = Array[String](["snapshots", "sensor_actuator", "disturbances", "plant_parameters", "simulation_settings", "feedforward", "advanced_pid", "kd"])
+locked_controls = Array[String](["controller_mode", "ki"])
+steps = Array[ExtResource("4_step")]([SubResource("Step_1"), SubResource("Step_2"), SubResource("Step_3"), SubResource("Step_4"), SubResource("Step_5"), SubResource("Step_6"), SubResource("Step_7")])
+
+[resource]
+script = ExtResource("1_scenario")
+title = "Lesson: P and I"
+notes = "A guided lesson: follow the steps on the Lesson tab. Some controls stay hidden or locked until you need them.\nTeacher: this lesson takes about 10 minutes. Progress is saved on each computer."
+start_mode = 0
+plant_script = ExtResource("2_plant")
+lesson = SubResource("Resource_lesson")
+pid_settings = Dictionary[String, Variant]({"proportional_gain": 0.05, "integral_gain": 0.0, "derivative_gain": 0.0})

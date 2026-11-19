@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="Scenario" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/scenario.gd" id="1_scenario"]
+[ext_resource type="Script" path="res://plants/cruise/cruise_plant.gd" id="2_plant"]
+
+[resource]
+script = ExtResource("1_scenario")
+title = "Cruise control on hills"
+notes = "1. Manual first: hold 90 km/h on the hills with the drive-force slider. You have to work hardest just before the top of each hill.\n2. Switch to PID (P only). The speed sags on every climb and runs fast downhill. Raise Kp: the sag shrinks but never disappears.\n3. Add Ki. The I term learns the hill's force as it goes, but always a little late. Watch the I trace in the Terms tab follow the slope.\n4. This is disturbance rejection: the setpoint never changes, the road does. Compare with a flat road (Plant parameters → hill steepness 0)."
+start_mode = 1
+plant_script = ExtResource("2_plant")
+setpoint_settings = Dictionary[String, Variant]({"pattern": 0, "target_level": 25.0})

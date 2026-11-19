@@ -1,6 +1,6 @@
 # Control Lab architecture
 
-This file describes the code as it stands now (Milestone D, in progress). README.md is the spec; this is the map.
+This file describes the code as it stands now (Milestone E, in progress). README.md is the spec; this is the map.
 
 ## Folder layout
 
@@ -13,10 +13,18 @@ plants/hotend/   plant #2 (temperature, dead time, heat-only)
 plants/mass_spring_damper/  plant #3
 plants/servo/    plant #4 (DC motor position)
 plants/elevator/ plant #5 (gravity, static friction, hard stops)
+plants/arm/      plant #6 (gravity torque ∝ cos θ, hard stops)
+plants/cruise/   plant #7 (speed on sine-wave hills: disturbance rejection)
+plants/drone/    plant #8 (thrust ≥ 0, gravity, ground/ceiling stops)
 plants/plant_catalog.gd     every plant type (used by the tests to cover all plants)
-scenarios/       scenario files (.tres, data only): what the toolbar's picker lists
+scenarios/       scenario files (.tres, data only): what the toolbar's picker lists (07-09 are challenges)
 core/scenario.gd, core/scenario_catalog.gd   the Scenario resource and the folder scan
-controllers/     Controller base class, ManualController, PidController
+core/scenario_setup.gd      builds a Simulation from a Scenario (shared by UI and headless runs)
+core/challenge*.gd          challenge data, grader, result, headless runner
+core/lesson*.gd, core/oscillation.gd   guided-lesson data, step checks, oscillation measurement
+core/zn_tuning.gd           Ziegler–Nichols / Tyreus–Luyben rules and swing judgement
+core/mystery.gd             mystery-plant parameter randomizer
+controllers/     Controller base class, ManualController, PidController, CascadeController
 signal_blocks/   SetpointGenerator (constant/step/square/ramp/sine), TrapezoidalProfile,
                  Sensor (noise/quantization/delay/low-pass), Actuator (deadband/saturation/slew),
                  DisturbanceGenerator (step/random/poke/parameter drift)
@@ -133,6 +141,64 @@ The bottom area has the output chart on the left and tabs on the right: Command,
 **Tuning slots A–D** (side panel › Snapshots): **Save** stores `PidController.get_tuning()`, which is every PID setting (gains, switches, feedforward), built from the script's variable list so new settings are included automatically. **Load + rerun** applies a slot's tuning, switches to PID, rebuilds the PID panel, and restarts from t = 0 with the same seed. Slots are kept per scenario for the session; saving them to disk is stage 19.
 
 **Ghost runs**: every Reset (and every Load) turns the run that is ending (if it lasted ≥ 1 s) into a `GhostRun`, a trimmed copy of its recorder. The newest 3 are drawn faded behind the live lines, for traces marked `ghost = true` (Measured, Applied). A ghost is labelled with a slot letter only if the whole run used that slot's exact tuning in PID mode; otherwise it is "run N". Ghosts are cleared when the scenario changes, because a different plant isn't comparable. Plot options: **Ghosts** on/off and **Clear ghosts**.
+
+## Mystery mode (stage 24, README §5)
+
+* `core/mystery.gd`: `make_parameters(plant, seed)` draws each parameter log-uniformly in ½×–2× its default (`SPREAD`); a parameter whose default is 0 is drawn from the bottom 30% of its range. Values are clamped to the slider ranges. A plant can exempt keys with `get_mystery_fixed_keys()`.
+* **main_screen.gd ("Mystery plant"):**
+  * The seed is the toolbar seed × 7919 + the roll number, so a class shares "seed 42, mystery #1".
+  * The parameter sliders hide (ParameterPanel `show_mystery`), and so does the Equations tab's plant section (`EquationsView.hide_plant`).
+  * Ghosts are cleared. Turning it off restores the scenario's parameters. Reveal lists the true values.
+* Scenario field `mystery_mode` starts a scenario with a mystery plant.
+
+## Cascaded PID (stage 23, README §6.2)
+
+* `controllers/cascade_controller.gd`: two ordinary PidControllers.
+  * The outer PID's output is the inner PID's setpoint. The outer output limit is `Plant.get_inner_setpoint_limit()`; the inner one is the input range.
+  * Before each `compute()`, Simulation sets `inner_measurement = plant.get_inner_output(state)`. This inner sensor is ideal; the sensor panel affects only the main measurement.
+  * The inner PID's kG·cos uses the outer measurement (the angle), via `PidController.reference_gravity_angle`.
+* Recorder channels `inner_setpoint` and `inner_measurement` feed the "Inner loop" plot tab. They are 0 when no cascade is running.
+* Plant hooks: `get_inner_definition()` (null = no cascade), `get_inner_output()`, `get_cascade_gain_definitions()`, `get_inner_setpoint_limit()`. `ScenarioSetup.make_cascade(plant)` builds one with the defaults.
+* Scenarios: `start_mode = CASCADED_PID`, plus `cascade_outer_settings` / `cascade_inner_settings` overrides.
+* **main_screen.gd:** a third ControllerMode, a `CascadePanel` in place of the PID panel, and `_current_tuning()` (PID or cascade) for the "one tuning all run" checks.
+* **Limitations (v1):** snapshots, challenges, lesson gain checks and the ZN helper use the single PID only.
+
+## Ziegler–Nichols helper (stage 22, README §7.6)
+
+* `core/zn_tuning.gd`:
+  * `judge(oscillation)` classifies a swing as NONE / DYING / STEADY / GROWING. Steady means the last cycle is within ±10% of the first, over at least 3 cycles.
+  * `make_table(Ku, Tu)` gives the ZN P / PI / PID and Tyreus–Luyben PI / PID rows in parallel form.
+  * `hits_input_limit` flags swings shaped by saturation, which is a limit cycle, not Ku.
+* `ui/zn_panel.gd`: a side-panel section, closed by default and hidden during a challenge test (lesson control name `zn_helper`).
+* **main_screen.gd ("Ziegler–Nichols helper"):**
+  * While the section is open in PID mode, it measures the last 10 s 4× per second.
+  * It shades every other measured cycle on the output plot ("1 cycle = Tu"), unless a challenge owns the plot bands.
+  * Apply keeps the old run as a ghost and labels the new run with the rule's name (`_run_label`).
+
+## Guided lessons (stage 21, README §7.6)
+
+* `core/lesson.gd` and `core/lesson_step.gd`: the lesson data, attached to a Scenario (see `docs/writing_a_scenario.md`). `Lesson.get_hidden/get_locked(step)` apply each step's cumulative `unlock_controls`.
+* `core/lesson_checks.gd`: a pure function from (step, simulation, PID, mode, clean run) to "" when the check passes, or the "waiting for" text.
+* `core/oscillation.gd`: counts cycles, the period and the growth in the last N seconds of the true output. Stage 22 reuses it to measure Tu.
+* **main_screen.gd ("Guided lesson"):**
+  * `_lesson_controls` maps control names to widgets.
+  * `_apply_lesson_step` hides controls (via `_update_section_visibility`, which also covers presenter mode and challenge tests) and greys out locked ones (`UiStyle.set_locked`, which remembers and restores each widget's own disabled state).
+  * Keyboard shortcuts check `_lesson_blocked`.
+  * Checks run 4× per second (`LESSON_CHECK_INTERVAL_S`) and latch once they pass.
+  * Progress is saved in `save.lessons[title] = {step, finished, completed}`.
+
+## Challenge mode (stage 20, README §7.6)
+
+* `core/challenge.gd`: the challenge data, attached to a Scenario. See `docs/writing_a_scenario.md`.
+* `core/scenario_setup.gd`: the **one** way a Simulation is built from a Scenario: plant, default PID, panel defaults, then the scenario's overrides. Both main_screen and the headless runner use it.
+* `core/challenge_grader.gd`: a pure function from (Challenge, recorder) to `ChallengeResult`. Step specs use `StepMetrics` on the samples before the load; load specs use the samples after it; samples after `duration_s` are ignored.
+* `core/challenge_runner.gd`: a headless run, used by the tests.
+* **Live test** (main_screen.gd, "Challenge test"):
+  * Run test keeps the current run as a ghost, then reloads the scenario. It keeps only the PID tuning, switches to PID, applies `Challenge.apply_to` and plays the run at the normal speed and time scale.
+  * `_process` limits the physics steps so the run stops exactly at `duration_s`. The run is then graded, and the best result is saved to `save.challenges[title]`.
+  * During the test, the sections that would change the result and the setpoint bar are hidden, and poking is ignored. Changing the tuning, switching the controller or pressing Reset cancels the test.
+  * `test_live_challenge_matches_headless_grade` checks that the live grade equals ChallengeRunner's grade exactly.
+* **Spec bands:** `StripChart.bands` shades where the output must be, drawn under the traces and included in auto-scale. `ChallengePanel.make_bands` builds the overshoot ceiling (red dashed), the settling and steady-state bands (green) and the load band (amber).
 
 ## Teaching tabs (stage 17)
 

@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="Scenario" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://core/scenario.gd" id="1_scenario"]
+[ext_resource type="Script" path="res://plants/elevator/elevator_plant.gd" id="2_plant"]
+[ext_resource type="Script" path="res://core/challenge.gd" id="3_challenge"]
+
+[sub_resource type="Resource" id="Resource_challenge"]
+script = ExtResource("3_challenge")
+goal = "Lift the carriage to 1 m. At 5 s a heavy box is loaded onto it: hold the height anyway."
+duration_s = 9.0
+random_seed = 3
+start_level = 0.0
+target_level = 1.0
+step_time_s = 1.0
+load_enabled = true
+load_force = 40.0
+load_time_s = 5.0
+specs = Dictionary[String, float]({"overshoot_percent": 3.0, "settling_time_s": 2.0, "load_peak_error": 0.04, "load_recovery_s": 1.5})
+
+[resource]
+script = ExtResource("1_scenario")
+title = "Challenge: elevator load"
+notes = "A tuning challenge with a disturbance: halfway through, a load is added.\nRead the goals on the Challenge tab, tune, then press Run test.\nThe height sensor reports 80 ms late, so a huge Kp makes the carriage oscillate.
+Hint: feedforward (kG) holds up the carriage's own weight, but only the integral can learn about an unexpected load."
+start_mode = 1
+plant_script = ExtResource("2_plant")
+sensor_settings = Dictionary[String, Variant]({"delay_enabled": true, "delay_s": 0.08})
+challenge = SubResource("Resource_challenge")

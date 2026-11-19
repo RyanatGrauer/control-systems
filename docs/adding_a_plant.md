@@ -14,6 +14,7 @@ Use `plants/flywheel/` as the worked example.
    * `get_equation_text(state, plant_input, disturbance)`: the ODE in symbols, then with live numbers, for the Equations tab (see the flywheel).
    * `get_feedforward_definitions()`: return `make_feedforward_definitions(ks_max, kv_max, ka_max, kg_max)`. Defaults are 0. Note the ideal values in a comment.
    * `get_pid_gain_definitions()`: return `make_pid_gain_definitions(kp_default, kp_max, ki_default, ki_max, kd_default, kd_max)`. Start P-only (Ki = Kd = 0). Units are generated automatically.
+   * Optional, for **Cascaded PID** (stage 23): `get_inner_definition()` (the inner loop's quantity, usually the output's rate, with a ± range), `get_inner_output(state)`, `get_cascade_gain_definitions()` (return `make_cascade_gain_definitions([outer kp, kp_max, ki, ki_max, kd, kd_max], [inner ...])`), and `get_inner_setpoint_limit()` (the outer loop's output limit, e.g. max climb speed). When these are defined, the controller menu offers "Cascaded PID" and an Inner loop plot tab appears. See the drone and the arm.
    * `get_visual_scene_path()`
    * Put the model equations in the header comment, with every symbol mapped to its variable name.
 3. **Visual** `<name>_visual.tscn` with a root `Node3D` whose script extends `PlantVisual3D`. In `_ready()` call `build_studio(look_at, distance, yaw, pitch)`, then build meshes. Use `PlantVisual3D.add_mesh()` for simple lit parts. Override `show_state()`, and `reset_visual()` if you keep animation history. Animate using `sim_time`, not frame time.

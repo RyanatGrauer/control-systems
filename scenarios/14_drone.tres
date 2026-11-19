@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Scenario" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/scenario.gd" id="1_scenario"]
+[ext_resource type="Script" path="res://plants/drone/drone_plant.gd" id="2_plant"]
+
+[resource]
+script = ExtResource("1_scenario")
+title = "Drone altitude"
+notes = "1. Manual first: lift off and hover at 3 m. The rotors can only push UP: to come down, you have to let gravity do it.\n2. Switch to PID (P only). It hovers below the target: the gap is the thrust gravity needs. Add Ki, or a hover feedforward kG = m·g = 9.81 N.\n3. Big setpoint steps: the thrust hits 0 N or 25 N (SATURATED), and with Ki the integral winds up. Try anti-windup in Advanced PID.\n4. Cascaded PID: the outer loop asks for a climb speed (limited to ±2 m/s), the inner loop makes the drone climb at that speed. Set the inner kG to 9.81 N, tune the inner loop on the Inner loop tab first, then the outer loop."
+start_mode = 0
+plant_script = ExtResource("2_plant")

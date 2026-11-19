@@ -43,3 +43,48 @@ static func make_hint(text: String) -> Label:
 	label.add_theme_font_size_override("font_size", HINT)
 	label.add_theme_color_override("font_color", HINT_COLOR)
 	return label
+
+
+# Greys out a control and everything inside it (lesson "locked" controls),
+# or undoes that. The previous disabled/editable state of each widget is
+# remembered in metadata, so unlocking restores exactly what was there.
+static func set_locked(root: Control, locked: bool) -> void:
+	if locked == root.has_meta("lesson_locked"):
+		return
+	if locked:
+		root.set_meta("lesson_locked", true)
+		root.modulate = Color(1.0, 1.0, 1.0, 0.5)
+	else:
+		root.remove_meta("lesson_locked")
+		root.modulate = Color.WHITE
+	_set_locked_recursive(root, locked)
+
+
+static func _set_locked_recursive(node: Node, locked: bool) -> void:
+	var key := "lesson_previous_state"
+	if node is BaseButton or node is Range or node is LineEdit:
+		if locked:
+			var enabled: bool
+			if node is BaseButton:
+				enabled = not (node as BaseButton).disabled
+				(node as BaseButton).disabled = true
+			elif node is Range:
+				enabled = node.get("editable") if "editable" in node else true
+				if "editable" in node:
+					node.set("editable", false)
+			else:
+				enabled = (node as LineEdit).editable
+				(node as LineEdit).editable = false
+			node.set_meta(key, enabled)
+		elif node.has_meta(key):
+			var enabled: bool = node.get_meta(key)
+			node.remove_meta(key)
+			if node is BaseButton:
+				(node as BaseButton).disabled = not enabled
+			elif node is Range:
+				if "editable" in node:
+					node.set("editable", enabled)
+			else:
+				(node as LineEdit).editable = enabled
+	for child in node.get_children():
+		_set_locked_recursive(child, locked)

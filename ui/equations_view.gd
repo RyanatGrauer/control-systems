@@ -18,6 +18,7 @@ const REFRESH_HZ: float = 8.0  # TUNABLE
 
 var _simulation: Simulation
 var _timer: float = 0.0
+var hide_plant: bool = false  # mystery mode: the plant's numbers would give the parameters away
 
 
 func setup(simulation: Simulation) -> void:
@@ -44,9 +45,11 @@ func refresh() -> void:
 	var plant := _simulation.plant
 	var controller := _simulation.controller
 	var period_ms := 1000.0 / _simulation.get_actual_controller_rate_hz()
+	var plant_text := "Hidden: this is a mystery plant, and its equation would give the parameters away." \
+			if hide_plant else plant.get_equation_text(_simulation.state, _simulation.plant_input,
+			_simulation.disturbance)
 	var content := "[b][color=#%s]Plant: %s[/color][/b]  (SI units, right now)\n%s\n\n" % [
-		SignalColors.TRUE_OUTPUT.to_html(false), plant.get_display_name(),
-		plant.get_equation_text(_simulation.state, _simulation.plant_input, _simulation.disturbance)]
+		SignalColors.TRUE_OUTPUT.to_html(false), plant.get_display_name(), plant_text]
 	content += "[b][color=#%s]Controller: %s[/color][/b]  (runs every Δt = %s ms; u is held between runs)\n%s" % [
 		SignalColors.COMMAND.to_html(false), controller.get_display_name(),
 		NumberFormat.significant(period_ms, 3),

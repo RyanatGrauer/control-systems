@@ -27,6 +27,10 @@ var _gain_sliders: Array[LabeledSlider] = []
 var _selected_gain: int = 0
 var _term_bars: TermBars
 var _isa_label: Label
+# Lessons (stage 21) hide or lock these by name; see get_lesson_control().
+var _limits_checkbox: CheckBox
+var _feedforward_section: CollapsibleSection
+var _advanced_section: CollapsibleSection
 
 
 func setup(simulation: Simulation, pid: PidController) -> void:
@@ -62,6 +66,7 @@ func setup(simulation: Simulation, pid: PidController) -> void:
 	limits.button_pressed = pid.use_output_limits
 	limits.focus_mode = Control.FOCUS_NONE
 	limits.toggled.connect(_on_limits_toggled)
+	_limits_checkbox = limits
 	add_child(limits)
 
 	var reset_integral := Button.new()
@@ -93,6 +98,28 @@ func update_panel() -> void:
 		_isa_label.text = "Same controller in ISA form:\nu = Kp·(e + (1/Ti)·Σ(e·Δt) + Td·Δe/Δt)\nKp = %s,  Ti = %s,  Td = %s" % [
 			NumberFormat.significant(_pid.proportional_gain, 3),
 			_format_time(_pid.get_integral_time()), _format_time(_pid.get_derivative_time())]
+
+
+# Lesson.CONTROL_NAMES that live in this panel ("kp", "feedforward"...), or null.
+func get_lesson_control(control_name: String) -> Control:
+	match control_name:
+		"kp":
+			return _gain_sliders[0]
+		"ki":
+			return _gain_sliders[1]
+		"kd":
+			return _gain_sliders[2]
+		"output_limits":
+			return _limits_checkbox
+		"feedforward":
+			return _feedforward_section
+		"advanced_pid":
+			return _advanced_section
+	return null
+
+
+func get_selected_gain() -> int:
+	return _selected_gain
 
 
 func select_gain(index: int) -> void:
@@ -138,6 +165,7 @@ func _format_time(seconds: float) -> String:
 
 func _build_feedforward_section() -> void:
 	var section := CollapsibleSection.new("Feedforward", false)
+	_feedforward_section = section
 	add_child(section)
 	var box := section.body
 	var definitions := _simulation.plant.get_feedforward_definitions()
@@ -169,6 +197,7 @@ func _build_feedforward_section() -> void:
 
 func _build_advanced_section() -> void:
 	var section := CollapsibleSection.new("Advanced PID", false)
+	_advanced_section = section
 	add_child(section)
 	var box := section.body
 

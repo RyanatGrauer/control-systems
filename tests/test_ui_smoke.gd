@@ -20,7 +20,10 @@ func test_every_plant_and_mode_runs() -> void:
 	tree.root.add_child(screen)  # runs _ready(): loads scenario 0
 	for plant_index in screen._scenarios.size():
 		screen._load_scenario(plant_index, 7, 2.0)
-		for mode in [0, 1]:  # Manual, PID
+		var modes := [0, 1]  # Manual, PID
+		if screen._cascade_controller != null:
+			modes.append(2)  # Cascaded PID
+		for mode in modes:
 			screen._on_controller_mode_selected(mode)
 			_run_frames(screen, 30)
 			screen._step_once()
@@ -277,3 +280,146 @@ func test_snapshots_are_saved_and_restored() -> void:
 	check_near(again._get_slots()["C"]["proportional_gain"], 4.25, 1e-12, "with its gain")
 	again._save_store.reset_all()
 	again.queue_free()
+
+
+func _find_scenario_index(screen: Node, title: String) -> int:
+	for i in screen._scenarios.size():
+		if screen._scenarios[i].title == title:
+			return i
+	return -1
+
+
+# Drives a live challenge test through the real screen and checks that the
+# grade is EXACTLY what the headless ChallengeRunner gives (fairness).
+func test_live_challenge_matches_headless_grade() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	var screen := MainScreenScene.instantiate()
+	tree.root.add_child(screen)
+	var index := _find_scenario_index(screen, "Challenge: servo")
+	check_true(index >= 0, "servo challenge exists")
+	screen._load_scenario(index, 1, 1.0)
+	check_true(screen._challenge_panel != null, "Challenge tab exists")
+	screen._on_controller_mode_selected(1)
+	screen._pid_controller.proportional_gain = 35.0
+	screen._pid_controller.derivative_gain = 4.0
+	var tuning: Dictionary = screen._pid_controller.get_tuning()
+
+	# What _on_run_test_requested does, without the deferred call.
+	screen._test_tuning = tuning.duplicate()
+	screen._load_scenario(index, screen._current_challenge().random_seed, 4.0)
+	check_equal(screen._challenge_state, screen.ChallengeState.RUNNING, "test is running")
+	check_true(not screen._locked_sections[1].visible, "setpoint settings hidden during the test")
+	check_true(not screen._output_chart.bands.is_empty(), "spec bands shown")
+	for i in 2000:
+		if screen._challenge_state != screen.ChallengeState.RUNNING:
+			break
+		screen._process(1.0 / 30.0)
+	check_equal(screen._challenge_state, screen.ChallengeState.FINISHED, "test finished")
+	check_near(screen._simulation.get_time(), screen._current_challenge().duration_s, 0.002,
+			"stopped exactly at the end")
+	check_true(screen._locked_sections[1].visible, "settings back after the test")
+
+	var live := ChallengeGrader.grade(screen._current_challenge(), screen._simulation.recorder,
+			screen._simulation.plant)
+	var headless: ChallengeResult = ChallengeRunner.run(screen._scenarios[index], tuning)[0]
+	for i in live.rows.size():
+		check_equal(live.rows[i]["value"], headless.rows[i]["value"],
+				"live == headless for " + live.rows[i]["key"])
+	check_equal(screen._get_challenge_record().get("best_score", -1), live.get_score(),
+			"best result recorded")
+	screen._save_store.reset_all()
+	screen.queue_free()
+
+
+func test_changing_gains_cancels_a_test() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	var screen := MainScreenScene.instantiate()
+	tree.root.add_child(screen)
+	var index := _find_scenario_index(screen, "Challenge: flywheel")
+	screen._test_tuning = screen._pid_controller.get_tuning()
+	screen._load_scenario(index, 7, 1.0)
+	_run_frames(screen, 10)
+	screen._pid_controller.proportional_gain *= 2.0
+	_run_frames(screen, 2)
+	check_equal(screen._challenge_state, screen.ChallengeState.IDLE, "tuning change cancels")
+	check_true(screen._output_chart.bands.is_empty(), "bands removed")
+	check_true(screen._locked_sections[1].visible, "settings unlocked")
+
+	screen._test_tuning = screen._pid_controller.get_tuning()
+	screen._load_scenario(index, 7, 1.0)
+	screen._on_user_reset()
+	check_equal(screen._challenge_state, screen.ChallengeState.IDLE, "Reset cancels")
+	screen.queue_free()
+
+
+# Lesson flow through the real screen: locked/hidden controls, Next gated by
+# the check, unlocks, saved progress, and Finish unlocking everything.
+func test_lesson_flow() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	var screen := MainScreenScene.instantiate()
+	tree.root.add_child(screen)
+	var index := _find_scenario_index(screen, "Lesson: P and I")
+	check_true(index >= 0, "flywheel lesson exists")
+	screen._load_scenario(index, 1, 1.0)
+	screen._on_lesson_restart()
+	check_true(screen._lesson_panel != null, "Lesson tab exists")
+	var mode_menu: OptionButton = screen._mode_menu
+	check_true(mode_menu.disabled, "mode menu locked at step 1")
+	check_true(not screen._lesson_controls["kd"].visible, "Kd hidden")
+	check_true(not screen._lesson_controls["plant_parameters"].visible, "parameters hidden")
+
+	screen._on_lesson_next()  # step 1 has no check
+	check_true(not mode_menu.disabled, "mode menu unlocked at step 2")
+	_run_frames(screen, 2)
+	check_true(screen._lesson_panel._next_button.disabled, "Next waits for PID mode")
+	mode_menu.select(1)
+	screen._on_controller_mode_selected(1)
+	_run_frames(screen, 20)
+	check_true(not screen._lesson_panel._next_button.disabled, "Next unlocks in PID mode")
+	screen._on_lesson_next()
+	var record: Dictionary = screen._save_store.data["lessons"]["Lesson: P and I"]
+	check_equal(record["step"], 2, "progress saved")
+
+	# Ki is locked until step 5: the slider ignores input.
+	var ki_slider: LabeledSlider = screen._lesson_controls["ki"]
+	check_true(not ki_slider._slider.editable, "Ki slider locked")
+	for i in 4:
+		screen._on_lesson_next()
+	check_true(ki_slider._slider.editable, "Ki slider unlocked at step 5")
+
+	screen._lesson_step = 6
+	screen._on_lesson_next()  # Finish
+	check_true(screen._lesson_finished, "finished")
+	check_true(screen._lesson_controls["kd"].visible, "everything unlocked when finished")
+	check_equal(screen._save_store.data["lessons"]["Lesson: P and I"]["completed"], true, "completed saved")
+	screen._save_store.reset_all()
+	screen.queue_free()
+
+
+# The ZN helper through the real screen: P only, a steady swing, capture,
+# apply a row, and the run's ghost carries the rule's name.
+func test_zn_helper_flow() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	var screen := MainScreenScene.instantiate()
+	tree.root.add_child(screen)
+	screen._load_scenario(_find_scenario_index(screen, "Mass-spring-damper"), 1, 4.0)
+	screen._zn_section.set_open(true)
+	screen._on_controller_mode_selected(1)
+	screen._pid_controller.proportional_gain = 1000.0
+	screen._pid_controller.derivative_gain = 5.0
+	screen._on_zn_p_only()
+	check_equal(screen._pid_controller.derivative_gain, 0.0, "P only clears Kd")
+	check_equal(screen._pid_controller.proportional_gain, 1000.0, "P only keeps Kp")
+	_run_frames(screen, 120)  # 4 s of sim per real second at 4x
+	check_true(not screen._zn_panel._capture_button.disabled, "steady swing can be captured")
+	check_true(not screen._output_chart.bands.is_empty(), "cycles shaded on the plot")
+	screen._on_zn_capture()
+	check_true(screen._zn_panel._table.visible, "table shown")
+	var row: Dictionary = ZnTuning.make_table(1000.0, screen._zn_oscillation.period)[4]
+	screen._on_zn_apply(row)
+	check_near(screen._pid_controller.proportional_gain, row["kp"], 1e-9, "row applied")
+	check_equal(screen._ghosts[-1].label, "run 1", "P-only run became a ghost")
+	_run_frames(screen, 60)
+	screen._on_user_reset()
+	check_equal(screen._ghosts[-1].label, "T-L  PID", "applied run is labelled with its rule")
+	screen.queue_free()

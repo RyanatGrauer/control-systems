@@ -24,7 +24,7 @@
 class_name Scenario
 extends Resource
 
-enum StartMode { MANUAL, PID }
+enum StartMode { MANUAL, PID, CASCADED_PID }  # CASCADED_PID: plants with an inner loop only
 
 @export var title: String = "New scenario"
 ## The plant's physics script, e.g. res://plants/flywheel/flywheel_plant.gd
@@ -34,6 +34,13 @@ enum StartMode { MANUAL, PID }
 @export var start_mode: StartMode = StartMode.MANUAL
 ## Controller rate in Hz (the physics rate stays at its default).
 @export var controller_rate_hz: float = Simulation.DEFAULT_CONTROLLER_RATE_HZ
+
+# Optional: makes this scenario a challenge (Challenge tab + "Run test").
+@export var challenge: Challenge
+## Start with a mystery plant: random, hidden parameters (stage 24).
+@export var mystery_mode: bool = false
+# Optional: makes this scenario a guided lesson (Lesson tab, hidden/locked controls).
+@export var lesson: Lesson
 
 @export_group("Overrides (SI units, variable names)")
 ## Plant parameter key -> value, e.g. "inertia": 0.0008 (see the plant's get_parameter_definitions()).
@@ -50,6 +57,10 @@ enum StartMode { MANUAL, PID }
 @export var sensor_settings: Dictionary[String, Variant] = {}
 ## Actuator variables, e.g. "saturation_enabled", "saturation_min", "slew_enabled".
 @export var actuator_settings: Dictionary[String, Variant] = {}
+## Cascaded PID (stage 23): the OUTER PidController's variables, e.g. "proportional_gain".
+@export var cascade_outer_settings: Dictionary[String, Variant] = {}
+## Cascaded PID: the INNER PidController's variables, e.g. "integral_gain", "gravity_gain".
+@export var cascade_inner_settings: Dictionary[String, Variant] = {}
 ## DisturbanceGenerator variables, e.g. "step_enabled", "step_load", "drift_key".
 @export var disturbance_settings: Dictionary[String, Variant] = {}
 
@@ -68,6 +79,18 @@ func create_plant() -> Plant:
 	return plant
 
 
+# The cascade's overrides (call after ScenarioSetup.make_cascade). `cascade`
+# is null for plants without an inner loop.
+func apply_cascade_settings(cascade: CascadeController, plant: Plant) -> void:
+	if cascade == null:
+		if start_mode == StartMode.CASCADED_PID or not cascade_outer_settings.is_empty() \
+				or not cascade_inner_settings.is_empty():
+			_report("plant '%s' has no inner loop, so no Cascaded PID" % plant.get_display_name())
+		return
+	_apply(cascade.outer, cascade_outer_settings, "cascade_outer_settings")
+	_apply(cascade.inner, cascade_inner_settings, "cascade_inner_settings")
+
+
 func apply_settings(simulation: Simulation, pid: PidController) -> void:
 	_apply(pid, pid_settings, "pid_settings")
 	_apply(simulation.setpoint_generator, setpoint_settings, "setpoint_settings")
@@ -77,6 +100,12 @@ func apply_settings(simulation: Simulation, pid: PidController) -> void:
 	_apply(simulation.actuator, actuator_settings, "actuator_settings")
 	_apply(simulation.disturbance_generator, disturbance_settings, "disturbance_settings")
 	simulation.set_controller_rate_hz(controller_rate_hz)
+	if challenge != null:
+		for problem in challenge.find_problems():
+			_report(problem)
+	if lesson != null:
+		for problem in lesson.find_problems():
+			_report(problem)
 
 
 func _apply(target: Object, settings: Dictionary, group_name: String) -> void:

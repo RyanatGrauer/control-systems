@@ -18,7 +18,9 @@
 #   - drawing is DECIMATED: for each pixel column we keep only the min and max
 #     sample, so long runs stay smooth on school laptops
 #   - ghost runs (GhostRun): earlier runs drawn faded behind the live traces,
-#     for every trace marked `ghost = true`. Challenge spec bands come later.
+#     for every trace marked `ghost = true`.
+#   - spec bands (challenge mode): shaded areas / limit lines that show where
+#     the output must be, e.g. "inside +/-2% after 1 s" or "below this line".
 class_name StripChart
 extends Control
 
@@ -42,6 +44,10 @@ var recorder: RunRecorder
 var traces: Array[ChartTrace] = []
 var ghosts: Array[GhostRun] = []  # shared with the owner; drawn oldest first
 var show_ghosts: bool = true
+# Challenge spec bands, in the chart's DISPLAY units and seconds:
+# {"t0", "t1", "y0", "y1", "color", "label"}. y0 == y1 draws a dashed limit
+# line instead of a shaded area. Set by main_screen.gd; empty = none.
+var bands: Array[Dictionary] = []
 var chart_title: String = ""
 var y_unit: String = ""
 var time_window_s: float = 10.0
@@ -111,6 +117,7 @@ func _draw() -> void:
 	var y_range := _get_y_range(time_range.x, time_range.y)
 
 	_draw_grid(plot_rect, time_range, y_range)
+	_draw_bands(plot_rect, time_range, y_range)
 	if show_ghosts:
 		for ghost in ghosts:
 			for trace in traces:
@@ -183,6 +190,11 @@ func _get_y_range(start_time: float, end_time: float) -> Vector2:
 					data_min = minf(data_min, value)
 					data_max = maxf(data_max, value)
 
+	# Spec bands are always fully on screen: they are the goal.
+	for band in bands:
+		data_min = minf(data_min, minf(band["y0"], band["y1"]))
+		data_max = maxf(data_max, maxf(band["y0"], band["y1"]))
+
 	if data_min == INF:  # no data at all
 		return Vector2(0.0, 1.0)
 	var span := data_max - data_min
@@ -238,6 +250,38 @@ func _draw_grid(plot_rect: Rect2, time_range: Vector2, y_range: Vector2) -> void
 				SignalColors.PLOT_AXIS_TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 
 	draw_rect(plot_rect, DisplaySettings.plot_grid(), false, 1.0)
+
+
+# Spec bands: drawn under the traces, clipped to the visible time window.
+func _draw_bands(plot_rect: Rect2, time_range: Vector2, y_range: Vector2) -> void:
+	for band in bands:
+		var t0 := maxf(band["t0"], time_range.x)
+		var t1 := minf(band["t1"], time_range.y)
+		if t1 <= t0:
+			continue
+		var x0 := _time_to_x(t0, plot_rect, time_range)
+		var x1 := _time_to_x(t1, plot_rect, time_range)
+		var y_top := _value_to_y(maxf(band["y0"], band["y1"]), plot_rect, y_range)
+		var y_bottom := _value_to_y(minf(band["y0"], band["y1"]), plot_rect, y_range)
+		var color: Color = band["color"]
+		if band["y0"] == band["y1"]:
+			_draw_dashed_polyline(PackedVector2Array([Vector2(x0, y_top), Vector2(x1, y_top)]),
+					color, 2.0 * UiStyle.LINE_WIDTH_SCALE)
+		else:
+			draw_rect(Rect2(x0, y_top, x1 - x0, y_bottom - y_top), Color(color, 0.18))
+			draw_line(Vector2(x0, y_top), Vector2(x1, y_top), Color(color, 0.7), 1.5)
+			draw_line(Vector2(x0, y_bottom), Vector2(x1, y_bottom), Color(color, 0.7), 1.5)
+		# Limit lines: label above the right end. Shaded bands: label under
+		# the left edge. Different corners, so they don't collide.
+		var label: String = band.get("label", "")
+		if label == "":
+			continue
+		if band["y0"] == band["y1"]:
+			_draw_text(Vector2(x1 - 6.0, y_top - 7.0), label, TICK_FONT_SIZE, color,
+					HORIZONTAL_ALIGNMENT_RIGHT)
+		else:
+			_draw_text(Vector2(x0 + 4.0, y_bottom + TICK_FONT_SIZE + 2.0), label, TICK_FONT_SIZE,
+					color, HORIZONTAL_ALIGNMENT_LEFT)
 
 
 # Draws one channel of `source` (the live recorder or a ghost's copy).

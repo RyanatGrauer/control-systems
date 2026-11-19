@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="Scenario" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://core/scenario.gd" id="1_scenario"]
+[ext_resource type="Script" path="res://plants/servo/servo_plant.gd" id="2_plant"]
+[ext_resource type="Script" path="res://core/challenge.gd" id="3_challenge"]
+
+[sub_resource type="Resource" id="Resource_challenge"]
+script = ExtResource("3_challenge")
+goal = "Turn the servo arm 90 degrees fast and land on target. The angle sensor is noisy, so a huge Kd makes the motor chatter."
+duration_s = 4.0
+random_seed = 11
+start_level = 0.0
+target_level = 1.5708
+step_time_s = 0.5
+specs = Dictionary[String, float]({"overshoot_percent": 5.0, "settling_time_s": 0.5, "steady_state_error": 0.01745, "effort": 70.0})
+
+[resource]
+script = ExtResource("1_scenario")
+title = "Challenge: servo"
+notes = "A tuning challenge with a noisy angle sensor (see Sensor & actuator).\nRead the goals on the Challenge tab, tune, then press Run test.\nHint: Kd damps the overshoot, but it also amplifies sensor noise. Try the D filter in Advanced PID."
+start_mode = 1
+plant_script = ExtResource("2_plant")
+sensor_settings = Dictionary[String, Variant]({"noise_enabled": true, "noise_std": 0.005})
+challenge = SubResource("Resource_challenge")

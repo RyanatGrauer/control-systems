@@ -83,6 +83,10 @@ var velocity_gain: float = 0.0        # kV
 var acceleration_gain: float = 0.0    # kA
 var gravity_gain: float = 0.0         # kG
 var gravity_uses_cosine: bool = false # kG * cos(measured angle), for arms
+# The angle kG·cos uses. NAN = this PID's own measurement. A cascade's inner
+# loop measures SPEED, so CascadeController passes the outer angle here.
+# ("reference_" names are left out of tunings, see get_tuning().)
+var reference_gravity_angle: float = NAN
 
 # Memory between ticks.
 var _integral_term: float = 0.0     # I[k-1], already includes Ki
@@ -163,7 +167,8 @@ func compute(setpoint: float, measurement: float, dt: float) -> float:
 func compute_feedforward(measurement: float) -> float:
 	if not feedforward_enabled:
 		return 0.0
-	var gravity := gravity_gain * (cos(measurement) if gravity_uses_cosine else 1.0)
+	var angle := measurement if is_nan(reference_gravity_angle) else reference_gravity_angle
+	var gravity := gravity_gain * (cos(angle) if gravity_uses_cosine else 1.0)
 	return static_gain * signf(reference_velocity) + velocity_gain * reference_velocity \
 			+ acceleration_gain * reference_acceleration + gravity
 

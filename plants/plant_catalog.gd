@@ -17,6 +17,9 @@ const PLANT_SCRIPTS: Array[GDScript] = [
 	preload("res://plants/mass_spring_damper/mass_spring_damper_plant.gd"),
 	preload("res://plants/servo/servo_plant.gd"),
 	preload("res://plants/elevator/elevator_plant.gd"),
+	preload("res://plants/arm/arm_plant.gd"),
+	preload("res://plants/cruise/cruise_plant.gd"),
+	preload("res://plants/drone/drone_plant.gd"),
 ]
 
 

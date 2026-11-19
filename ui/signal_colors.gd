@@ -41,6 +41,11 @@ const GHOST_COLORS: Array[Color] = [
 const TERM_SUM: Color = Color("#FFFFFF")       # white, drawn dashed
 
 # Plot furniture.
+# Challenge spec bands (stage 20): where the output must be.
+const SPEC_BAND: Color = Color("#6FE08A")      # green: "be inside here"
+const SPEC_LIMIT: Color = Color("#FF6B6B")     # red dashed: "stay below this line"
+const LOAD_BAND: Color = Color("#FFB86B")      # amber: after the load
+
 const PLOT_BACKGROUND: Color = Color(0.09, 0.10, 0.12)
 const PLOT_GRID: Color = Color(1.0, 1.0, 1.0, 0.10)
 const PLOT_AXIS_TEXT: Color = Color(0.80, 0.82, 0.86)

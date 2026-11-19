@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="Scenario" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://core/scenario.gd" id="1_scenario"]
+[ext_resource type="Script" path="res://plants/mass_spring_damper/mass_spring_damper_plant.gd" id="2_plant"]
+[ext_resource type="Script" path="res://core/lesson.gd" id="3_lesson"]
+[ext_resource type="Script" path="res://core/lesson_step.gd" id="4_step"]
+
+[sub_resource type="Resource" id="Step_1"]
+script = ExtResource("4_step")
+prompt = "This block hangs on a spring, and a P controller pushes it toward the orange target. Raise Kp until the block bounces at least 5 times after a step. Press Reset (R) to see a fresh step."
+check = "oscillating"
+check_value = 5.0
+unlock_controls = Array[String]([])
+
+[sub_resource type="Resource" id="Step_2"]
+script = ExtResource("4_step")
+prompt = "More Kp makes it faster, but bouncier. Kd is unlocked: D pushes against the block's speed, like a shock absorber. Raise Kd a little."
+check = "kd_at_least"
+check_value = 10.0
+unlock_controls = Array[String](["kd"])
+
+[sub_resource type="Resource" id="Step_3"]
+script = ExtResource("4_step")
+prompt = "Press Reset. Tune Kd (and Kp) until the block settles with less than 10% overshoot."
+check = "overshoot_at_most"
+check_value = 10.0
+unlock_controls = Array[String]([])
+
+[sub_resource type="Resource" id="Step_4"]
+script = ExtResource("4_step")
+prompt = "Now try a LOT of Kd and press Reset. Why does the block crawl toward the target? Press Finish when you can explain it."
+check = ""
+check_value = 0.0
+unlock_controls = Array[String]([])
+
+[sub_resource type="Resource" id="Resource_lesson"]
+script = ExtResource("3_lesson")
+hidden_controls = Array[String](["snapshots", "sensor_actuator", "disturbances", "plant_parameters", "simulation_settings", "feedforward", "advanced_pid", "ki"])
+locked_controls = Array[String](["controller_mode", "kd"])
+steps = Array[ExtResource("4_step")]([SubResource("Step_1"), SubResource("Step_2"), SubResource("Step_3"), SubResource("Step_4")])
+
+[resource]
+script = ExtResource("1_scenario")
+title = "Lesson: what D does"
+notes = "A guided lesson: follow the steps on the Lesson tab. Some controls stay hidden or locked until you need them.\nTeacher: this lesson takes about 10 minutes."
+start_mode = 1
+plant_script = ExtResource("2_plant")
+lesson = SubResource("Resource_lesson")
+pid_settings = Dictionary[String, Variant]({"proportional_gain": 20.0, "integral_gain": 0.0, "derivative_gain": 0.0})
